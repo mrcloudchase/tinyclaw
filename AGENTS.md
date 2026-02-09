@@ -11,11 +11,22 @@ npm run dev          # Run CLI from source via tsx
 npm start            # Run compiled CLI from dist/
 ```
 
-No test framework is configured. Verify changes with `npm run typecheck` and `npm run build`.
+### Testing
+
+```bash
+npm test              # Run all tests (vitest run)
+npm run test:watch    # Watch mode
+npm run test:coverage # Coverage with v8 provider
+```
+
+- Tests are collocated: `src/**/*.test.ts`
+- Pool: `forks` (isolates module-level singletons)
+- Coverage thresholds: 70% lines/functions/branches, 55% statements
+- Mocking: `vi.mock()` for fs, paths, logger; `vi.stubEnv()` for env vars
 
 ## Architecture
 
-TinyClaw is a ~16K line AI assistant platform extracted from OpenClaw. Two entry points: `src/cli.ts` (executable with subcommands: serve, init, pair, config, status, doctor, cron, logs, sessions) and `src/index.ts` (library API with 60+ exports).
+TinyClaw is a ~11K line AI assistant platform extracted from OpenClaw. Two entry points: `src/cli.ts` (executable with subcommands: serve, init, pair, config, status, doctor, cron, logs, sessions) and `src/index.ts` (library API with 60+ exports).
 
 ### Core Flow
 
@@ -39,7 +50,8 @@ TinyClaw is a ~16K line AI assistant platform extracted from OpenClaw. Two entry
 | Security | `security.ts` | 10-layer policy evaluation, SSRF guard, exec allowlist with auto-approve |
 | Channels | `channel.ts` + `channel/*.ts` | WhatsApp, Telegram (grammY), Discord (discord.js), Slack (Bolt) |
 | Gateway | `gateway.ts`, `gateway-http.ts`, `gateway-methods.ts`, `webchat.ts` | HTTP + WebSocket, JSON-RPC 2.0, 23 RPC methods, OpenAI-compatible endpoints, WebChat UI, webhook endpoint, presence system |
-| Plugins | `plugin.ts` | 10 registration methods, 4-origin discovery (bundled, config, user dir, workspace `.tinyclaw/plugins/`) |
+| Plugins | `plugin.ts` | 10 registration methods, 4-origin discovery (bundled, config, user dir, workspace `.tinyclaw/plugins/`). Note: plugin slots in `src/plugins/` are TODO stubs; working channels live in `src/channel/` |
+| Skills | `skills.ts`, `skills/bundled/*.md` | YAML frontmatter .md files, 6 bundled + user dirs |
 | Hooks | `hooks.ts` | 14 event types, hooks can return `{ abort, transform }` to control pipeline |
 | Memory | `memory.ts`, `memory/embeddings.ts` | SQLite + FTS5 + optional sqlite-vec, hybrid search (0.7 cosine + 0.3 BM25) |
 | Auth | `auth/keys.ts` | Multi-key rotation, persistent cooldowns at `~/.config/tinyclaw/auth-state.json`, failure classification |
@@ -59,6 +71,12 @@ TinyClaw is a ~16K line AI assistant platform extracted from OpenClaw. Two entry
 - `@mariozechner/pi-agent-core` / `pi-coding-agent` / `pi-ai` / `pi-tui` — Core agent framework (session management, tool execution, TUI). Types like `AgentSession`, `AgentTool`, `ThinkingLevel` come from here.
 - `better-sqlite3` — Used in memory system, loaded via `require()` (not ESM import) for bundler compatibility.
 - `zod` — All config validation. Schema types are exported and used throughout.
+
+**Optional dependencies** (lazy-loaded via `require()` with graceful fallback):
+- `playwright-core` — Browser automation (`src/browser.ts`)
+- `sharp` — Image processing (`src/media.ts`)
+- `edge-tts` — Edge TTS provider (`src/tts.ts`)
+- `sqlite-vec` — Vector search extension (`src/memory.ts`)
 
 ## Key Conventions
 

@@ -3,8 +3,10 @@
 </p>
 
 <p align="center">
-  A full-featured AI assistant platform in ~16K lines of TypeScript.
+  A full-featured AI assistant platform in ~11K lines of TypeScript.
 </p>
+
+[![CI](https://github.com/mrcloudchase/tinyclaw/actions/workflows/ci.yml/badge.svg)](https://github.com/mrcloudchase/tinyclaw/actions/workflows/ci.yml)
 
 ---
 
@@ -25,7 +27,7 @@ Includes a CLI coding agent, TUI mode, gateway server with WebSocket + HTTP API,
 - **Channels** — WhatsApp, Telegram, Discord, Slack with full adapter support (text, image, audio, video, documents, reactions, threads)
 - **Docker Sandbox** — Isolated code execution in containers with configurable memory/CPU/network limits
 - **DM Pairing** — Unknown sender security with pairing codes and allow-list management
-- **Plugin System** — 10 registration methods, 4-origin discovery (bundled, config, directory, workspace), 33 bundled plugins
+- **Plugin System** — 10 registration methods, 4-origin discovery (bundled, config, directory, workspace), 33 plugin slots (4 core channels implemented, 29 TODO stubs)
 - **Security** — 10-layer tool policy engine, SSRF guard, prompt injection detection, path traversal prevention, pairing gate, exec approval with allowlist
 - **Session Durability** — Advisory file locking, crash repair, tool result truncation, token/usage tracking, auto-reset policies (daily/idle/manual)
 - **Auth Resilience** — Multi-key rotation with persistent cooldowns, failure classification (auth/rate_limit/billing/timeout), backoff persistence across restarts
@@ -220,6 +222,31 @@ docker build -f Dockerfile.sandbox -t tinyclaw-sandbox .
 ```
 
 When enabled, all `bash` tool calls from channel sessions execute inside isolated containers with configurable memory, CPU, and network restrictions.
+
+## Docker Deployment
+
+Run TinyClaw as a production container:
+
+```bash
+# Build the production image
+docker build -t tinyclaw .
+
+# Run the gateway server
+docker run -d \
+  -p 18789:18789 \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -v tinyclaw-data:/home/tinyclaw/.config/tinyclaw \
+  tinyclaw
+
+# Run with custom config
+docker run -d \
+  -p 18789:18789 \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -v ./config.json5:/home/tinyclaw/.config/tinyclaw/config.json5:ro \
+  tinyclaw
+```
+
+The image uses a non-root `tinyclaw` user, includes git for workspace operations, and exposes port 18789 for the gateway server.
 
 ## DM Pairing
 
@@ -523,11 +550,13 @@ export default function init(api: TinyClawPluginApi) {
 }
 ```
 
-### 33 Bundled Plugins
+### 33 Plugin Slots
 
-**Channels (18):** Telegram, Discord, Slack, Signal, iMessage, Instagram, Messenger, Twitter/X, Matrix, Teams, LINE, WeChat, Viber, Rocket.Chat, Zulip, Webex, Google Chat, Mattermost
+The plugin system has 33 plugin slots defined in `src/plugins/`. **4 core channel adapters** are fully implemented and live in `src/channel/` (WhatsApp, Telegram, Discord, Slack). The remaining **29 slots are scaffold stubs** for future implementation:
 
-**Non-channel (15):** Memory Core, Memory LanceDB, Copilot Proxy, TTS Manager, Canvas Renderer, Cron Scheduler, Media Processor, Browser Manager, Analytics, Rate Limiter, Audit Logger, Webhook Relay, Vector Search, Notification Hub, Backup Manager
+**Channel stubs (14):** Signal, iMessage, Instagram, Messenger, Twitter/X, Matrix, Teams, LINE, WeChat, Viber, Rocket.Chat, Zulip, Webex, Google Chat
+
+**Non-channel stubs (15):** Memory Core, Memory LanceDB, Copilot Proxy, TTS Manager, Canvas Renderer, Cron Scheduler, Media Processor, Browser Manager, Analytics, Rate Limiter, Audit Logger, Webhook Relay, Vector Search, Notification Hub, Backup Manager
 
 ## Skills
 
@@ -546,6 +575,17 @@ Review the pull request and provide:
 ```
 
 Usage: `/summarize-pr #123` — The skill content is injected as context for the agent.
+
+### Bundled Skills
+
+| Skill | Description |
+|-------|-------------|
+| `weather` | Check weather via wttr.in (no API key) |
+| `github` | GitHub operations via gh CLI (PRs, issues, CI) |
+| `healthcheck` | System and security audit |
+| `summarize` | Summarize URLs, files, or content |
+| `web-search` | Multi-source web research |
+| `notes` | Markdown note-taking using file tools |
 
 ## Hook Transforms
 
@@ -734,7 +774,7 @@ src/
 ├── tts.ts                    Edge/OpenAI/ElevenLabs TTS
 ├── media.ts                  Image/audio processing, AI vision
 ├── tools/                    Web search/fetch + 17 agent tool implementations
-└── plugins/                  33 bundled plugin stubs
+└── plugins/                  33 plugin slots (TODO stubs)
 ```
 
 ## Development
@@ -751,15 +791,24 @@ npm run build
 
 # Run from source
 npx tsx src/cli.ts "Hello"
+
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
 ```
 
 ## Dependencies
 
-- **Runtime:** `zod`, `commander`, `chalk`, `ws`, `json5`
+- **Runtime:** `zod`, `commander`, `chalk`, `ws`, `json5`, `better-sqlite3`
 - **AI:** `@mariozechner/pi-agent-core`, `@mariozechner/pi-ai`, `@mariozechner/pi-coding-agent`
 - **Channels:** `grammy` (Telegram), `discord.js` (Discord), `@slack/bolt` + `@slack/web-api` (Slack)
 - **UI:** `@inquirer/prompts` (init wizard), `@mariozechner/pi-tui` (TUI mode)
-- **Optional:** `better-sqlite3` (memory), `playwright-core` (browser), `sharp` (images), `edge-tts` (TTS)
+- **Optional (lazy-loaded):** `playwright-core` (browser), `sharp` (images), `edge-tts` (TTS), `sqlite-vec` (vector search) — all gracefully fall back if unavailable
 
 ## License
 
