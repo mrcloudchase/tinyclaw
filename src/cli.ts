@@ -25,6 +25,7 @@ program
   .option("--verbose", "Verbose output")
   .option("--json", "JSON output mode")
   .option("--ephemeral", "Use in-memory session (no persistence)")
+  .option("--no-tui", "Disable TUI mode, use bare REPL")
   .option("--config <path>", "Config file path override")
   .argument("[message...]", "Message to send (omit for interactive mode)")
   .action(async (messageParts: string[], opts) => {
@@ -52,7 +53,7 @@ program
     } else {
       await runInteractive(config, {
         sessionName: opts.session, workspaceDir, provider, modelId,
-        thinkingLevel, ephemeral: opts.ephemeral, forceNew: opts.new,
+        thinkingLevel, ephemeral: opts.ephemeral, forceNew: opts.new, noTui: opts.noTui,
       });
     }
   });
@@ -84,6 +85,85 @@ program
         log.error(`Failed to start gateway: ${err instanceof Error ? err.message : err}`);
       }
       process.exit(1);
+    }
+  });
+
+// ── Init subcommand ──
+program
+  .command("init")
+  .description("Interactive setup wizard")
+  .option("--force", "Overwrite existing config")
+  .action(async (opts) => {
+    const { runInitWizard } = await import("./init.js");
+    await runInitWizard({ force: opts.force });
+  });
+
+// ── Pair subcommand ──
+const pairCmd = program
+  .command("pair")
+  .description("Manage DM pairing for unknown senders");
+
+pairCmd
+  .command("list")
+  .description("Show pending pairing requests and allowed senders")
+  .action(async () => {
+    const { getPairingStore } = await import("./pairing.js");
+    const store = getPairingStore();
+    const pending = store.listPending();
+    const allowed = store.listAllowed();
+    console.log(chalk.cyan("Pending Pairing Requests:"));
+    if (pending.length === 0) {
+      console.log(chalk.dim("  (none)"));
+    } else {
+      for (const r of pending) {
+        const expires = new Date(r.expiresAt).toLocaleTimeString();
+        console.log(`  ${chalk.yellow(r.code)}  ${r.channelId}/${r.peerId}${r.peerName ? ` (${r.peerName})` : ""}  expires ${expires}`);
+      }
+    }
+    console.log();
+    console.log(chalk.cyan("Allowed Senders:"));
+    if (allowed.length === 0) {
+      console.log(chalk.dim("  (none)"));
+    } else {
+      for (const a of allowed) {
+        const when = new Date(a.approvedAt).toLocaleDateString();
+        console.log(`  ${a.channelId}/${a.peerId}  approved ${when} via ${a.approvedVia ?? "unknown"}`);
+      }
+    }
+  });
+
+pairCmd
+  .command("approve <code>")
+  .description("Approve a pairing code")
+  .action(async (code: string) => {
+    const { getPairingStore } = await import("./pairing.js");
+    const store = getPairingStore();
+    const result = store.approveCode(code);
+    if (result) {
+      console.log(chalk.green(`✓ Approved: ${result.channelId}/${result.peerId}`));
+    } else {
+      console.log(chalk.red("✗ Invalid or expired code."));
+    }
+  });
+
+pairCmd
+  .command("revoke <peerId>")
+  .description("Revoke access for a peer (format: channelId/peerId)")
+  .action(async (peerArg: string) => {
+    const { getPairingStore } = await import("./pairing.js");
+    const store = getPairingStore();
+    const [channelId, peerId] = peerArg.includes("/") ? peerArg.split("/", 2) : ["*", peerArg];
+    if (channelId === "*") {
+      // Revoke across all channels
+      const allowed = store.listAllowed().filter((a) => a.peerId === peerId);
+      for (const a of allowed) {
+        store.revokeAccess(a.channelId, a.peerId);
+      }
+      console.log(chalk.yellow(`Revoked access for peerId ${peerId} across ${allowed.length} channel(s)`));
+    } else {
+      const ok = store.revokeAccess(channelId, peerId);
+      if (ok) console.log(chalk.yellow(`Revoked: ${channelId}/${peerId}`));
+      else console.log(chalk.dim("No matching entry found."));
     }
   });
 
@@ -122,9 +202,20 @@ async function runInteractive(
   config: ReturnType<typeof loadConfig>,
   opts: {
     sessionName: string; workspaceDir: string; provider?: string; modelId?: string;
-    thinkingLevel?: ThinkingLevel; ephemeral?: boolean; forceNew?: boolean;
+    thinkingLevel?: ThinkingLevel; ephemeral?: boolean; forceNew?: boolean; noTui?: boolean;
   },
 ) {
+  // Try TUI mode first (unless --no-tui)
+  if (!opts.noTui) {
+    try {
+      const { startTui } = await import("./tui.js");
+      await startTui(config, opts);
+      return;
+    } catch {
+      // TUI not available or failed, fall back to bare REPL
+    }
+  }
+
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   console.error(chalk.cyan("TinyClaw Interactive Mode"));
   console.error(chalk.dim("Type /quit to exit, /new to reset session, /compact to compact context\n"));

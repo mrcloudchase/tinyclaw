@@ -1,6 +1,6 @@
 {
   "name": "tinyclaw",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A minimal AI coding agent extracted from OpenClaw",
   "type": "module",
   "bin": {
@@ -18,12 +18,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@inquirer/prompts": "^7.10.1",
     "@mariozechner/pi-agent-core": "0.52.8",
     "@mariozechner/pi-ai": "0.52.8",
     "@mariozechner/pi-coding-agent": "0.52.8",
+    "@mariozechner/pi-tui": "^0.52.8",
+    "@slack/bolt": "^4.6.0",
+    "@slack/web-api": "^7.13.0",
     "better-sqlite3": "^12.6.2",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
+    "discord.js": "^14.25.1",
+    "grammy": "^1.39.3",
     "json5": "^2.2.3",
     "ws": "^8.19.0",
     "zod": "^3.24.2"

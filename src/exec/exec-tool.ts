@@ -8,6 +8,7 @@ interface ExecToolOptions {
   timeoutSec?: number;
   backgroundMs?: number;
   maxOutput?: number;
+  sandboxContainer?: string;
 }
 
 interface ExecSession {
@@ -41,8 +42,23 @@ async function executeCommand(
     backgroundMs: number;
     maxOutput: number;
     background?: boolean;
+    sandboxContainer?: string;
   },
 ): Promise<{ output: string; exitCode: number | null; sessionId?: string }> {
+  // Sandbox routing: execute inside Docker container if specified
+  if (opts.sandboxContainer) {
+    const { execInSandbox } = await import("../sandbox.js");
+    const result = await execInSandbox(opts.sandboxContainer, command, {
+      timeoutSec: opts.timeoutSec,
+      workdir: opts.cwd,
+      env: opts.env,
+    });
+    return {
+      output: truncateOutput(result.output, opts.maxOutput),
+      exitCode: result.exitCode,
+    };
+  }
+
   const { shell, args } = getShellConfig();
   const cwd = opts.cwd || process.cwd();
 
@@ -159,6 +175,7 @@ export function createExecTool(options?: ExecToolOptions) {
   const defaultTimeoutSec = options?.timeoutSec ?? 1800;
   const defaultBackgroundMs = options?.backgroundMs ?? 10000;
   const defaultMaxOutput = options?.maxOutput ?? 200_000;
+  const sandboxContainer = options?.sandboxContainer;
 
   return {
     name: "bash" as const,
@@ -206,6 +223,7 @@ export function createExecTool(options?: ExecToolOptions) {
         backgroundMs: defaultBackgroundMs,
         maxOutput: defaultMaxOutput,
         background,
+        sandboxContainer,
       });
 
       const parts: string[] = [];

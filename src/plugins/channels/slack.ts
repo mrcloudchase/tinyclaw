@@ -18,10 +18,12 @@ export default function init(api: TinyClawPluginApi) {
       document: true,
       threads: true,
       reaction: true,
+      editMessage: true,
+      deleteMessage: true,
       video: false,
       audio: false,
       sticker: false,
-      groups: false,
+      groups: true,
     },
     adapter: {},
   });

@@ -47,6 +47,12 @@ export { startScheduler, type CronJob } from "./cron.js";
 export { synthesize, shouldAutoTts, type TtsResult, type TtsProvider } from "./tts.js";
 export { describeImage, processImage, saveMediaFile, detectMime } from "./media.js";
 
+// Sandbox
+export { ensureSandboxImage, ensureSandboxContainer, execInSandbox, removeSandboxContainer, listSandboxContainers, cleanupAllSandboxes, containerName, resolveSandboxConfig, type SandboxConfig, type SandboxExecResult } from "./sandbox.js";
+
+// Pairing
+export { PairingStore, getPairingStore, initPairingStore } from "./pairing.js";
+
 // Util
 export { log, setVerbose, setJsonMode, setLogFile } from "./util/logger.js";
 export { isContextOverflowError, isAuthError, isRateLimitError, describeError } from "./util/errors.js";

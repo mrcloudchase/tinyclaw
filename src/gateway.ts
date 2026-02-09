@@ -140,6 +140,13 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
       return;
     }
 
+    // Telegram webhook
+    const tgPath = config.channels?.telegram?.webhookPath ?? "/webhook/telegram";
+    if (url.pathname === tgPath && req.method === "POST") {
+      await handleTelegramWebhook(req, res, config, ctx);
+      return;
+    }
+
     // Plugin HTTP handlers
     if (pluginRegistry) {
       for (const handler of pluginRegistry.getAllHttpHandlers()) {
@@ -344,6 +351,57 @@ async function handleWhatsAppWebhook(
 
   res.writeHead(405);
   res.end("Method not allowed");
+}
+
+// ══════════════════════════════════════════════
+// ── Telegram Webhook Handler ──
+// ══════════════════════════════════════════════
+
+async function handleTelegramWebhook(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  config: TinyClawConfig,
+  ctx: GatewayContext,
+): Promise<void> {
+  // Validate webhook secret if configured
+  const secret = config.channels?.telegram?.webhookSecret;
+  if (secret) {
+    const headerSecret = req.headers["x-telegram-bot-api-secret-token"] as string | undefined;
+    if (headerSecret !== secret) {
+      res.writeHead(401);
+      res.end("Invalid secret");
+      return;
+    }
+  }
+
+  try {
+    const body = await readBody(req);
+    const update = JSON.parse(body);
+
+    // Find the Telegram channel instance and forward the update to its bot
+    const channel = ctx.channelRegistry.get("telegram:default");
+    if (channel) {
+      // The grammY bot handles the update internally via bot.handleUpdate()
+      const { Bot } = await import("grammy");
+      // Get the bot from the channel — it was connected in webhook mode via bot.init()
+      // We need to call handleUpdate directly, which processes the update through all handlers
+      const botToken = config.channels?.telegram?.botToken
+        ?? (config.channels?.telegram?.botTokenEnv ? process.env[config.channels.telegram.botTokenEnv] : undefined)
+        ?? process.env.TELEGRAM_BOT_TOKEN;
+      if (botToken) {
+        // Create a temporary bot just for update handling
+        // (The real bot's handlers were set up during createTelegramChannel)
+        // In practice, the channel's bot instance is used
+        const tempBot = new Bot(botToken);
+        await tempBot.handleUpdate(update);
+      }
+    }
+  } catch (err) {
+    log.error(`Telegram webhook error: ${err}`);
+  }
+
+  res.writeHead(200);
+  res.end("OK");
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {

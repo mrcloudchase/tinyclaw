@@ -124,6 +124,22 @@ export async function dispatch(params: {
   try {
     // Pipeline stages
     finalizeInbound(ctx);
+
+    // Pairing gate — block unknown senders if pairing is required
+    if (ctx.source === "channel" && ctx.config.security?.pairingRequired && ctx.channelId) {
+      const { getPairingStore } = await import("./pairing.js");
+      const store = getPairingStore();
+      if (!store.isAllowed(ctx.channelId, ctx.peerId)) {
+        const request = store.createRequest(ctx.channelId, ctx.peerId, ctx.peerName);
+        const reply = `🔒 Access requires pairing.\n\nYour pairing code: **${request.code}**\n\nAsk the admin to run:\n\`tinyclaw pair approve ${request.code}\`\n\nCode expires in 1 hour.`;
+        // Send pairing instructions directly
+        if (ctx.channel?.adapter.sendText) {
+          await ctx.channel.adapter.sendText(ctx.peerId, reply, ctx.accountId);
+        }
+        return { reply, sessionKey: ctx.sessionKey };
+      }
+    }
+
     processDirectives(ctx);
 
     const cmdResult = await processCommand(ctx);
@@ -167,13 +183,22 @@ function finalizeInbound(ctx: MsgContext): void {
     ctx.agentId = resolveAgentForChannel(ctx.config, ctx.channelId, ctx.accountId, ctx.peerId);
   }
 
-  // Build session key
+  // Build session key (with group/thread isolation)
   if (ctx.channelId) {
+    const isolation = ctx.config.channels?.defaults?.groupIsolation ?? "per-group";
+    let sessionPeer: string;
+    if (ctx.isGroup && ctx.threadId && isolation === "per-thread") {
+      sessionPeer = `${ctx.peerId}:${ctx.threadId}`;
+    } else if (ctx.isGroup && isolation === "shared") {
+      sessionPeer = "shared";
+    } else {
+      sessionPeer = ctx.threadId ?? ctx.peerId;
+    }
     ctx.sessionKey = buildSessionKey(
       ctx.agentId ?? "default",
       ctx.channelId,
       ctx.accountId ?? "default",
-      ctx.threadId ?? ctx.peerId,
+      sessionPeer,
     );
   } else {
     ctx.sessionKey = ctx.peerId;
@@ -282,6 +307,17 @@ async function processCommand(ctx: MsgContext): Promise<string | undefined> {
 
 async function orchestrate(ctx: MsgContext, onChunk?: (chunk: string) => void): Promise<PipelineResult> {
   const workspaceDir = ctx.config.workspace?.dir ?? process.cwd();
+
+  // Resolve sandbox container if enabled for channel sessions
+  let sandboxContainer: string | undefined;
+  if (ctx.source === "channel" && ctx.config.sandbox?.enabled) {
+    try {
+      const { ensureSandboxContainer } = await import("./sandbox.js");
+      sandboxContainer = await ensureSandboxContainer(ctx.sessionKey, ctx.config.sandbox) ?? undefined;
+    } catch (err) {
+      log.warn(`Sandbox setup failed: ${err}`);
+    }
+  }
 
   // Get or create session
   let tinyClawSession = activeSessions.get(ctx.sessionKey);

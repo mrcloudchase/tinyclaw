@@ -95,6 +95,7 @@ const WhatsAppAccountSchema = z.object({
 const ChannelsSchema = z.object({
   defaults: z.object({
     groupPolicy: z.enum(["reply-all", "mention-only", "off"]).default("mention-only"),
+    groupIsolation: z.enum(["per-group", "per-thread", "shared"]).default("per-group"),
     heartbeatMs: z.number().optional(),
   }).optional(),
   whatsapp: z.object({
@@ -104,9 +105,31 @@ const ChannelsSchema = z.object({
     appSecretEnv: z.string().optional(),
     accounts: z.record(z.string(), WhatsAppAccountSchema).optional(),
   }).optional(),
-  telegram: z.object({ enabled: z.boolean().default(false), botToken: z.string().optional(), botTokenEnv: z.string().optional() }).optional(),
-  discord: z.object({ enabled: z.boolean().default(false), botToken: z.string().optional(), botTokenEnv: z.string().optional() }).optional(),
-  slack: z.object({ enabled: z.boolean().default(false), botToken: z.string().optional(), appToken: z.string().optional() }).optional(),
+  telegram: z.object({
+    enabled: z.boolean().default(false),
+    botToken: z.string().optional(),
+    botTokenEnv: z.string().optional(),
+    mode: z.enum(["polling", "webhook"]).default("polling"),
+    webhookUrl: z.string().optional(),
+    webhookPath: z.string().default("/webhook/telegram"),
+    webhookSecret: z.string().optional(),
+  }).optional(),
+  discord: z.object({
+    enabled: z.boolean().default(false),
+    botToken: z.string().optional(),
+    botTokenEnv: z.string().optional(),
+    mentionOnly: z.boolean().default(true),
+    dmEnabled: z.boolean().default(true),
+  }).optional(),
+  slack: z.object({
+    enabled: z.boolean().default(false),
+    botToken: z.string().optional(),
+    botTokenEnv: z.string().optional(),
+    appToken: z.string().optional(),
+    appTokenEnv: z.string().optional(),
+    mentionOnly: z.boolean().default(true),
+    threadReplies: z.boolean().default(true),
+  }).optional(),
 });
 
 // ── Plugins ──
@@ -229,6 +252,7 @@ const SecuritySchema = z.object({
   maxToolCallsPerTurn: z.number().default(50),
   deniedTools: z.array(z.string()).optional(),
   elevatedTools: z.array(z.string()).optional(),
+  pairingRequired: z.boolean().default(false),
 });
 
 // ── Multi-Agent ──
@@ -270,6 +294,18 @@ const PipelineSchema = z.object({
   typingIndicator: z.boolean().default(true),
 });
 
+// ── Sandbox ──
+const SandboxSchema = z.object({
+  enabled: z.boolean().default(false),
+  image: z.string().default("tinyclaw-sandbox"),
+  scope: z.enum(["session", "shared"]).default("session"),
+  memoryLimit: z.string().default("512m"),
+  cpuLimit: z.string().default("1"),
+  networkMode: z.enum(["none", "bridge"]).default("none"),
+  mountWorkspace: z.boolean().default(false),
+  timeoutSec: z.number().default(300),
+});
+
 // ══════════════════════════════════════════════
 // ── Root Config ──
 // ══════════════════════════════════════════════
@@ -290,6 +326,7 @@ export const TinyClawConfigSchema = z.object({
   tts: TtsSchema.optional(),
   media: MediaSchema.optional(),
   security: SecuritySchema.optional(),
+  sandbox: SandboxSchema.optional(),
   multiAgent: MultiAgentSchema.optional(),
   pipeline: PipelineSchema.optional(),
 });

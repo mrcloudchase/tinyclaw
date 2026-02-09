@@ -165,6 +165,69 @@ export async function initChannels(config: TinyClawConfig, registry: ChannelRegi
     }
   }
 
+  // Telegram
+  if (config.channels?.telegram?.enabled) {
+    try {
+      const { createTelegramChannel } = await import("./channel/telegram.js");
+      const telegramConfig = config.channels.telegram;
+      const botToken = telegramConfig.botToken
+        ?? (telegramConfig.botTokenEnv ? process.env[telegramConfig.botTokenEnv] : undefined)
+        ?? process.env.TELEGRAM_BOT_TOKEN;
+      if (botToken) {
+        const ch = createTelegramChannel(botToken, telegramConfig, config);
+        registry.register(ch);
+        if (ch.adapter.connect) await ch.adapter.connect();
+      } else {
+        log.warn("Telegram enabled but no bot token found");
+      }
+    } catch (err) {
+      log.warn(`Failed to init Telegram: ${err}`);
+    }
+  }
+
+  // Discord
+  if (config.channels?.discord?.enabled) {
+    try {
+      const { createDiscordChannel } = await import("./channel/discord.js");
+      const discordConfig = config.channels.discord;
+      const botToken = discordConfig.botToken
+        ?? (discordConfig.botTokenEnv ? process.env[discordConfig.botTokenEnv] : undefined)
+        ?? process.env.DISCORD_BOT_TOKEN;
+      if (botToken) {
+        const ch = createDiscordChannel(botToken, discordConfig, config);
+        registry.register(ch);
+        if (ch.adapter.connect) await ch.adapter.connect();
+      } else {
+        log.warn("Discord enabled but no bot token found");
+      }
+    } catch (err) {
+      log.warn(`Failed to init Discord: ${err}`);
+    }
+  }
+
+  // Slack
+  if (config.channels?.slack?.enabled) {
+    try {
+      const { createSlackChannel } = await import("./channel/slack.js");
+      const slackConfig = config.channels.slack;
+      const botToken = slackConfig.botToken
+        ?? (slackConfig.botTokenEnv ? process.env[slackConfig.botTokenEnv] : undefined)
+        ?? process.env.SLACK_BOT_TOKEN;
+      const appToken = slackConfig.appToken
+        ?? (slackConfig.appTokenEnv ? process.env[slackConfig.appTokenEnv] : undefined)
+        ?? process.env.SLACK_APP_TOKEN;
+      if (botToken && appToken) {
+        const ch = createSlackChannel(botToken, appToken, slackConfig, config);
+        registry.register(ch);
+        if (ch.adapter.connect) await ch.adapter.connect();
+      } else {
+        log.warn("Slack enabled but bot token or app token not found");
+      }
+    } catch (err) {
+      log.warn(`Failed to init Slack: ${err}`);
+    }
+  }
+
   // Other channels can be initialized similarly via plugins
   log.info(`Initialized ${registry.list().length} channels`);
 }
