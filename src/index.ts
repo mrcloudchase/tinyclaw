@@ -34,7 +34,7 @@ export { createChannelRegistry, getChannelRegistry, initChannels, shutdownChanne
 export { startGateway, stopGateway, type GatewayContext, type PresenceEntry } from "./gateway.js";
 
 // Plugins
-export { TinyClawPluginApi, PluginRegistry, discoverAndLoadPlugins, type PluginMeta, type PluginInitFn, type PluginRegistration } from "./plugin.js";
+export { TinyClawPluginApi, PluginRegistry, discoverAndLoadPlugins, type PluginMeta, type PluginInitFn, type PluginRegistration } from "./plugin/plugin.js";
 
 // Hooks
 export { registerHook, unregisterHook, runHooks, initHooksFromConfig, type HookEvent, type HookResult } from "./hooks.js";
