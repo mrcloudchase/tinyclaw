@@ -107,7 +107,7 @@ pairCmd
   .command("list")
   .description("Show pending pairing requests and allowed senders")
   .action(async () => {
-    const { getPairingStore } = await import("./pairing.js");
+    const { getPairingStore } = await import("./security/pairing.js");
     const store = getPairingStore();
     const pending = store.listPending();
     const allowed = store.listAllowed();
@@ -136,7 +136,7 @@ pairCmd
   .command("approve <code>")
   .description("Approve a pairing code")
   .action(async (code: string) => {
-    const { getPairingStore } = await import("./pairing.js");
+    const { getPairingStore } = await import("./security/pairing.js");
     const store = getPairingStore();
     const result = store.approveCode(code);
     if (result) {
@@ -150,7 +150,7 @@ pairCmd
   .command("revoke <peerId>")
   .description("Revoke access for a peer (format: channelId/peerId)")
   .action(async (peerArg: string) => {
-    const { getPairingStore } = await import("./pairing.js");
+    const { getPairingStore } = await import("./security/pairing.js");
     const store = getPairingStore();
     const [channelId, peerId] = peerArg.includes("/") ? peerArg.split("/", 2) : ["*", peerArg];
     if (channelId === "*") {
@@ -411,7 +411,7 @@ async function runInteractive(
   // Try TUI mode first (unless --no-tui)
   if (!opts.noTui) {
     try {
-      const { startTui } = await import("./tui.js");
+      const { startTui } = await import("./tui/tui.js");
       await startTui(config, opts);
       return;
     } catch {

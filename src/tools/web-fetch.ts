@@ -1,6 +1,6 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { TinyClawConfig } from "../config/schema.js";
-import { ssrfCheck } from "../security.js";
+import { ssrfCheck } from "../security/security.js";
 import { log } from "../utils/logger.js";
 import { defineTool } from "./helper.js";
 

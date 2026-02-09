@@ -2,7 +2,7 @@
 
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { TinyClawConfig } from "../config/schema.js";
-import { evaluatePolicy, type PolicyContext } from "../security.js";
+import { evaluatePolicy, type PolicyContext } from "../security/security.js";
 import { log } from "../utils/logger.js";
 
 import { createBrowserTools } from "./browser.js";

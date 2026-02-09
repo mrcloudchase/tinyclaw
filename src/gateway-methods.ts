@@ -4,7 +4,7 @@
 import type { TinyClawConfig } from "./config/schema.js";
 import type { GatewayContext } from "./gateway.js";
 import { dispatch, clearSession, getActiveSessionKeys, getActiveSessionCount } from "./pipeline.js";
-import { listPendingApprovals, resolveApproval } from "./security.js";
+import { listPendingApprovals, resolveApproval } from "./security/security.js";
 import { loadConfig, watchConfig } from "./config/loader.js";
 import { log } from "./utils/logger.js";
 
@@ -224,7 +224,7 @@ defineMethod("memory.search", async (params, config) => {
   const query = params.query as string;
   if (!query) throw new Error("Missing 'query' parameter");
   const limit = (params.limit as number) ?? 10;
-  const { createMemoryStore } = await import("./memory.js");
+  const { createMemoryStore } = await import("./memory/memory.js");
   const store = createMemoryStore(config);
   const results = await store.search(query, limit);
   return { results: results.map((r) => ({ id: r.entry.id, content: r.entry.content, score: r.score, matchType: r.matchType })) };
@@ -234,7 +234,7 @@ defineMethod("memory.search", async (params, config) => {
 defineMethod("memory.store", async (params, config) => {
   const content = params.content as string;
   if (!content) throw new Error("Missing 'content' parameter");
-  const { createMemoryStore } = await import("./memory.js");
+  const { createMemoryStore } = await import("./memory/memory.js");
   const store = createMemoryStore(config);
   const id = await store.store(content, (params.metadata as Record<string, unknown>) ?? {}, (params.tags as string[]) ?? []);
   return { id };

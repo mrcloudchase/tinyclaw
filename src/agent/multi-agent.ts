@@ -1,11 +1,11 @@
 // Multi-Agent — Session keys + bindings + spawn + A2A routing
 // All in ONE file
 
-import type { TinyClawConfig } from "./config/schema.js";
-import type { TinyClawSession } from "./agent/session.js";
-import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentForChannel } from "./agent/session.js";
-import { runAgent } from "./agent/runner.js";
-import { log } from "./utils/logger.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import type { TinyClawSession } from "./session.js";
+import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentForChannel } from "./session.js";
+import { runAgent } from "./runner.js";
+import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Agent Registry ──

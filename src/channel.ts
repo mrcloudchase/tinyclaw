@@ -3,7 +3,7 @@
 
 import type { TinyClawConfig } from "./config/schema.js";
 import { log } from "./utils/logger.js";
-import { runHooks } from "./hooks.js";
+import { runHooks } from "./hooks/hooks.js";
 
 // ══════════════════════════════════════════════
 // ── Channel Adapter Interface (23 adapter slots) ──

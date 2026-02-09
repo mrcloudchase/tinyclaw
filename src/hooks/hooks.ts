@@ -1,9 +1,9 @@
 // Hook System — Types + runner + 4 bundled hooks
 // All in ONE file
 
-import { log } from "./utils/logger.js";
-import type { TinyClawConfig } from "./config/schema.js";
-import type { PluginHookHandler } from "./plugin/plugin.js";
+import { log } from "../utils/logger.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import type { PluginHookHandler } from "../plugin/plugin.js";
 
 // ══════════════════════════════════════════════
 // ── Hook Event Types (14 events) ──

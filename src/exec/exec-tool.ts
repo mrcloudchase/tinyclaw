@@ -3,7 +3,7 @@ import path from "node:path";
 import { getShellConfig, killProcessTree } from "./shell.js";
 import { log } from "../utils/logger.js";
 import type { TinyClawConfig } from "../config/schema.js";
-import type { ApprovalMode } from "../security.js";
+import type { ApprovalMode } from "../security/security.js";
 
 interface ExecToolOptions {
   cwd?: string;
@@ -225,7 +225,7 @@ export function createExecTool(options?: ExecToolOptions) {
 
       // Exec approval for channel sessions in interactive mode
       if (execSource === "channel" && execConfig?.security?.execApproval === "interactive") {
-        const { requestApproval, isCommandAllowed } = await import("../security.js");
+        const { requestApproval, isCommandAllowed } = await import("../security/security.js");
         if (!isCommandAllowed(command)) {
           const { id, promise } = requestApproval(command);
           log.info(`Exec approval requested: ${id} — "${command}"`);
@@ -234,7 +234,7 @@ export function createExecTool(options?: ExecToolOptions) {
             return { content: [{ type: "text" as const, text: "Command denied by admin." }] };
           }
           // Track approval for auto-allowlist
-          const { trackApproval } = await import("../security.js");
+          const { trackApproval } = await import("../security/security.js");
           trackApproval(command);
         }
       }

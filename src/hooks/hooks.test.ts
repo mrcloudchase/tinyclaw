@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("./utils/logger.js", () => ({
+vi.mock("../utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-vi.mock("./plugin.js", () => ({}));
+vi.mock("../plugin/plugin.js", () => ({}));
 
 import { registerHook, unregisterHook, runHooks } from "./hooks.js";
 

@@ -2,13 +2,13 @@
 // Uses pi-tui's component system for rich terminal rendering
 // Falls back gracefully to bare REPL if pi-tui API doesn't match
 
-import type { TinyClawConfig } from "./config/schema.js";
+import type { TinyClawConfig } from "../config/schema.js";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import type { Component } from "@mariozechner/pi-tui";
-import { runAgent } from "./agent/runner.js";
-import { compactSession } from "./agent/compact.js";
-import type { TinyClawSession } from "./agent/session.js";
-import { log } from "./utils/logger.js";
+import { runAgent } from "../agent/runner.js";
+import { compactSession } from "../agent/compact.js";
+import type { TinyClawSession } from "../agent/session.js";
+import { log } from "../utils/logger.js";
 import chalk from "chalk";
 
 // ══════════════════════════════════════════════

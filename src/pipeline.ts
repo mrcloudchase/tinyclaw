@@ -7,8 +7,8 @@ import type { TinyClawSession } from "./agent/session.js";
 import type { HookFn } from "./agent/runner.js";
 import { runAgent } from "./agent/runner.js";
 import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentForChannel } from "./agent/session.js";
-import { runHooks } from "./hooks.js";
-import { detectInjection, wrapUntrustedContent, sanitizeForLog } from "./security.js";
+import { runHooks } from "./hooks/hooks.js";
+import { detectInjection, wrapUntrustedContent, sanitizeForLog } from "./security/security.js";
 import { shouldAutoTts, synthesize, summarizeForTts } from "./tts/tts.js";
 import { log } from "./utils/logger.js";
 
@@ -189,7 +189,7 @@ export async function dispatch(params: {
 
     // Pairing gate — block unknown senders if pairing is required
     if (ctx.source === "channel" && ctx.config.security?.pairingRequired && ctx.channelId) {
-      const { getPairingStore } = await import("./pairing.js");
+      const { getPairingStore } = await import("./security/pairing.js");
       const store = getPairingStore();
       if (!store.isAllowed(ctx.channelId, ctx.peerId)) {
         const request = store.createRequest(ctx.channelId, ctx.peerId, ctx.peerName);

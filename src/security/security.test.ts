@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("./utils/logger.js", () => ({
+vi.mock("../utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
@@ -13,7 +13,7 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("./config/paths.js", () => ({
+vi.mock("../config/paths.js", () => ({
   resolveConfigDir: () => "/mock/.config/tinyclaw",
 }));
 
@@ -27,7 +27,7 @@ import {
   sanitizePath,
   type PolicyContext,
 } from "./security.js";
-import type { TinyClawConfig } from "./config/schema.js";
+import type { TinyClawConfig } from "../config/schema.js";
 
 const baseConfig: TinyClawConfig = {
   agent: { provider: "anthropic", model: "claude-sonnet-4-5-20250929", thinkingLevel: "off" },
