@@ -3,21 +3,24 @@
 </p>
 
 <p align="center">
-  A full-featured AI assistant platform in ~10K lines of TypeScript.
+  A full-featured AI assistant platform in ~16K lines of TypeScript.
 </p>
 
 ---
 
-Includes a CLI coding agent, TUI mode, gateway server with WebSocket + HTTP API, messaging channels (WhatsApp, Telegram, Discord, Slack), plugin system, Docker sandboxing, DM pairing security, session durability with file locking and crash repair, auth resilience with persistent cooldowns, block streaming with per-channel limits, exec approval with auto-allowlist, SOUL.md personality, hybrid vector + BM25 memory search, full cron expressions, config hot-reload, hook transforms, skill commands, and multi-agent orchestration.
+Includes a CLI coding agent, TUI mode, gateway server with WebSocket + HTTP API, embedded WebChat UI, messaging channels (WhatsApp, Telegram, Discord, Slack), plugin system, Docker sandboxing, DM pairing security, session durability with file locking and crash repair, auth resilience with persistent cooldowns, block streaming with per-channel limits, message deduplication, queue/collect mode, exec approval with auto-allowlist, SOUL.md personality, bootstrap files, hybrid vector + BM25 memory search, web search and web fetch tools, local model auto-detection (Ollama, LM Studio, vLLM, LiteLLM), presence system, webhook endpoint, full cron expressions, config hot-reload, hook transforms, skill commands, and multi-agent orchestration.
 
 ## Features
 
 - **CLI Agent** — Interactive REPL and single-shot mode with streaming output
+- **CLI Subcommands** — `config get/set`, `status`, `doctor`, `cron list/add/remove`, `logs`, `sessions`
 - **TUI Mode** — Rich terminal UI via pi-tui with markdown rendering and tool panels
 - **Setup Wizard** — `tinyclaw init` interactive onboarding with provider, channel, and security setup
-- **Gateway Server** — HTTP + WebSocket server with JSON-RPC 2.0 protocol, 21 RPC methods
+- **Gateway Server** — HTTP + WebSocket server with JSON-RPC 2.0 protocol, 23 RPC methods
+- **WebChat UI** — Embedded dark-theme chat interface served from the gateway at `/` or `/chat`
 - **OpenAI-Compatible API** — `/v1/chat/completions`, `/v1/responses`, `/v1/models`
-- **Message Pipeline** — Inbound debouncing, directives (`++think`, `++model`), slash commands, paragraph-aware chunking, delivery with typing indicators, envelope context
+- **Webhook Endpoint** — Generic webhook with Bearer token auth, wake and agent modes
+- **Message Pipeline** — Inbound debouncing, message deduplication (60s TTL), queue/collect mode, directives (`++think`, `++model`), slash commands, paragraph-aware chunking, delivery with typing indicators, envelope context
 - **Block Streaming** — Coalescer with per-channel text limits (WhatsApp 1600, Telegram 4096, Discord 2000), code block awareness, dedup
 - **Channels** — WhatsApp, Telegram, Discord, Slack with full adapter support (text, image, audio, video, documents, reactions, threads)
 - **Docker Sandbox** — Isolated code execution in containers with configurable memory/CPU/network limits
@@ -27,13 +30,17 @@ Includes a CLI coding agent, TUI mode, gateway server with WebSocket + HTTP API,
 - **Session Durability** — Advisory file locking, crash repair, tool result truncation, token/usage tracking, auto-reset policies (daily/idle/manual)
 - **Auth Resilience** — Multi-key rotation with persistent cooldowns, failure classification (auth/rate_limit/billing/timeout), backoff persistence across restarts
 - **Memory** — SQLite + FTS5 full-text search + vector search (sqlite-vec + OpenAI embeddings), hybrid scoring (0.7 cosine + 0.3 BM25)
+- **Web Tools** — Web search via Brave Search API and URL fetching with HTML-to-text extraction
 - **Personality** — SOUL.md persona loading, agent identity (name/emoji/prefix), group chat context and style
+- **Bootstrap Files** — Supports SOUL.md, IDENTITY.md, USER.md, TOOLS.md, TINYCLAW.md, CLAUDE.md, AGENTS.md, BOOTSTRAP.md
 - **Browser** — Chrome/CDP automation via playwright-core (navigate, click, type, screenshot, accessibility snapshot)
 - **Cron** — Job scheduler with full 5-field cron expressions, intervals, one-time jobs, catch-up on missed runs
 - **TTS** — Three providers (Edge TTS, OpenAI, ElevenLabs) with auto-summarize
 - **Media** — MIME detection, image processing (sharp), AI vision (Anthropic/OpenAI), audio format detection
 - **Multi-Agent** — Session key routing, agent-channel bindings, subagent spawning, agent-to-agent messaging
 - **Model Flexibility** — Anthropic, OpenAI, Google, custom providers, model aliases, fallback chains, multi-key rotation
+- **Local Models** — Auto-detection for Ollama, LM Studio, vLLM, and LiteLLM with default endpoints
+- **Presence System** — Real-time client tracking with TTL sweep and heartbeat broadcasts
 - **Config Hot-Reload** — Automatic config file watching with debounce, selective reload, restart warnings
 - **Hook Transforms** — Hooks can transform data or abort pipeline, sequential execution with priority ordering
 - **Skill Commands** — `/skillname args` dispatches to SKILL.md files with prompt-based or tool-based execution
@@ -105,6 +112,15 @@ tinyclaw --no-tui
 | `tinyclaw pair list` | Show pending pairing requests and allowed senders |
 | `tinyclaw pair approve <code>` | Approve a pairing code |
 | `tinyclaw pair revoke <channelId/peerId>` | Revoke access for a sender |
+| `tinyclaw config get [key]` | Read config values (dot-notation) |
+| `tinyclaw config set <key> <value>` | Write config values |
+| `tinyclaw status` | Show gateway health (uptime, model, sessions, heap) |
+| `tinyclaw sessions` | List active sessions via gateway |
+| `tinyclaw doctor` | Check config, API keys, gateway, channels, Brave Search |
+| `tinyclaw cron list` | List scheduled cron jobs |
+| `tinyclaw cron add <expr> <body>` | Add a cron job |
+| `tinyclaw cron remove <id>` | Remove a cron job |
+| `tinyclaw logs` | Tail the gateway log file |
 
 ## Channels
 
@@ -332,7 +348,7 @@ ws.send(JSON.stringify({
 }));
 ```
 
-### RPC Methods (21)
+### RPC Methods (23)
 
 | Method | Description |
 |--------|-------------|
@@ -356,6 +372,8 @@ ws.send(JSON.stringify({
 | `exec.pending` | List pending exec approvals |
 | `exec.approve` | Approve a pending exec |
 | `exec.deny` | Deny a pending exec |
+| `presence.list` | List connected clients with roles and timestamps |
+| `presence.upsert` | Update or register a presence entry |
 | `system.shutdown` | Graceful shutdown |
 
 ### HTTP API (OpenAI-Compatible)
@@ -403,7 +421,12 @@ Run `tinyclaw init` for an interactive setup wizard, or create the file manually
     "port": 18789,
     "bind": "loopback",
     "auth": { "mode": "token", "token": "my-secret" },
-    "reload": { "mode": "auto", "debounceMs": 2000 }
+    "reload": { "mode": "auto", "debounceMs": 2000 },
+    "webhook": {
+      "enabled": false,
+      "path": "/webhook/generic",
+      "tokenEnv": "WEBHOOK_SECRET"
+    }
   },
   "channels": {
     "defaults": {
@@ -448,6 +471,8 @@ Run `tinyclaw init` for an interactive setup wizard, or create the file manually
     "inboundDebounceMs": 1500,
     "typingIndicator": true,
     "envelope": true,
+    "collectMode": false,
+    "collectWindowMs": 2000,
     "chunkSize": { "min": 800, "max": 1200 },
     "deliveryDelayMs": { "min": 800, "max": 2500 }
   },
@@ -457,7 +482,7 @@ Run `tinyclaw init` for an interactive setup wizard, or create the file manually
 }
 ```
 
-## Tools (17 built-in)
+## Tools (19 built-in)
 
 | Tool | Description |
 |------|-------------|
@@ -465,8 +490,8 @@ Run `tinyclaw init` for an interactive setup wizard, or create the file manually
 | `write` / `edit` / `read` | File operations |
 | `glob` / `grep` | File search |
 | `browser_navigate` / `browser_click` / `browser_type` / `browser_screenshot` / `browser_snapshot` | Browser automation |
-| `web_search` | Web search (Brave/Perplexity) |
-| `web_fetch` | Fetch and parse URLs |
+| `web_search` | Web search via Brave Search API (requires `BRAVE_API_KEY`) |
+| `web_fetch` | Fetch URL and extract text (HTML stripped to plain text) |
 | `memory_search` / `memory_store` | Persistent memory |
 | `cron_list` / `cron_set` / `cron_delete` | Job scheduling |
 | `tts_speak` | Text-to-speech |
@@ -552,18 +577,134 @@ When the gateway is running, config file changes are detected automatically:
 
 Changes to channels, hooks, and cron are applied immediately. Changes to `gateway.*` or `plugins.*` log a restart warning. Connected WebSocket clients receive a `config.reload` event.
 
+## WebChat UI
+
+The gateway serves an embedded chat interface at `/` or `/chat`. No frontend build step required — it's a self-contained HTML page with dark theme, WebSocket connection, auto-reconnect, and streaming support.
+
+```bash
+# Start gateway, then open browser
+tinyclaw serve
+open http://localhost:18789
+```
+
+## Webhook Endpoint
+
+Accept external triggers via a generic webhook:
+
+```json
+{
+  "gateway": {
+    "webhook": {
+      "enabled": true,
+      "path": "/webhook/generic",
+      "tokenEnv": "WEBHOOK_SECRET"
+    }
+  }
+}
+```
+
+Supports two modes via the `mode` query parameter:
+- `wake` (default) — Dispatches the body text through the pipeline
+- `agent` — Runs the body as an agent prompt and returns the result
+
+Authenticated via `Authorization: Bearer <token>` header.
+
+## Presence System
+
+Real-time tracking of connected clients (UI, CLI, WebChat, nodes, backends):
+
+```javascript
+// List all connected clients
+ws.send(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "presence.list" }));
+
+// Register/update presence
+ws.send(JSON.stringify({
+  jsonrpc: "2.0", id: 2, method: "presence.upsert",
+  params: { id: "my-client", role: "ui" }
+}));
+```
+
+Entries expire after 5 minutes without a heartbeat. The gateway broadcasts heartbeats every 60 seconds.
+
+## Local Models
+
+TinyClaw auto-detects local model providers by name:
+
+| Provider | Default Endpoint |
+|----------|-----------------|
+| `ollama` | `http://127.0.0.1:11434/v1` |
+| `lmstudio` | `http://127.0.0.1:1234/v1` |
+| `vllm` | `http://127.0.0.1:8000/v1` |
+| `litellm` | `http://127.0.0.1:4000/v1` |
+
+```json
+{
+  "agent": {
+    "provider": "ollama",
+    "model": "llama3.1"
+  }
+}
+```
+
+No additional configuration needed — the base URL is inferred from the provider name.
+
+## Message Deduplication
+
+The pipeline automatically deduplicates messages using a 60-second TTL window. Messages from the same channel with the same message ID are silently dropped. This prevents double-processing when channels retry delivery.
+
+## Queue/Collect Mode
+
+Batch rapid sequential messages into a single agent turn:
+
+```json
+{
+  "pipeline": {
+    "collectMode": true,
+    "collectWindowMs": 2000
+  }
+}
+```
+
+When enabled, messages arriving within the collect window are concatenated with newlines and dispatched as a single message. Useful for channels where users send multiple short messages in quick succession.
+
+## Bootstrap Files
+
+TinyClaw loads the first matching file from the workspace root to inject into the system prompt:
+
+`SOUL.md` → `IDENTITY.md` → `USER.md` → `TOOLS.md` → `TINYCLAW.md` → `CLAUDE.md` → `AGENTS.md` → `BOOTSTRAP.md` → `.tinyclaw` → `.claude`
+
+Use these to define personality, custom instructions, tool guidance, or any persistent context for the agent.
+
+## Web Tools
+
+Two built-in tools for web access:
+
+- **`web_search`** — Search the web via Brave Search API. Requires `BRAVE_API_KEY` or `BRAVE_SEARCH_API_KEY` environment variable. Returns titles, URLs, and snippets.
+- **`web_fetch`** — Fetch any URL and extract text content. HTML is stripped to plain text (scripts/styles removed, entities decoded). Supports JSON, HTML, and plain text responses.
+
+## Doctor
+
+Run diagnostics to verify your setup:
+
+```bash
+tinyclaw doctor
+```
+
+Checks: config file validity, API key presence, gateway connectivity, channel token availability, and Brave Search API key.
+
 ## Architecture
 
 ```
 src/
-├── cli.ts                    CLI + REPL + serve + init + pair commands
+├── cli.ts                    CLI + REPL + serve + init + pair + config/status/doctor/cron/logs
 ├── index.ts                  Public API exports
 ├── tui.ts                    TUI mode via pi-tui
 ├── init.ts                   Interactive setup wizard
+├── webchat.ts                Embedded WebChat UI (self-contained HTML/CSS/JS)
 ├── config/                   Zod schemas, loader, paths, watcher
 ├── agent/                    Session (locking, repair), runner, tools, system prompt, compact, pruning
 ├── auth/keys.ts              Multi-key rotation with backoff + persistent cooldowns
-├── model/resolve.ts          Aliases, fallback chains, custom providers
+├── model/resolve.ts          Aliases, fallback chains, local provider auto-detection
 ├── exec/                     Shell execution (with sandbox routing)
 ├── util/                     Logger, errors
 ├── security.ts               10-layer policy, SSRF, injection detection, exec allowlist
@@ -572,7 +713,7 @@ src/
 ├── plugin.ts                 Plugin API, registry, 4-origin loader
 ├── hooks.ts                  14 event types, hook runner with transform/abort, bundled hooks
 ├── skills.ts                 Skill discovery, formatting, and command execution
-├── pipeline.ts               Message dispatch, directives, commands, chunking, delivery, session reset
+├── pipeline.ts               Message dispatch, dedup, collect mode, directives, commands, chunking, delivery
 ├── pipeline/
 │   └── coalescer.ts          Block streaming coalescer with code block awareness
 ├── memory/
@@ -583,16 +724,16 @@ src/
 │   ├── telegram.ts           Telegram via grammY
 │   ├── discord.ts            Discord via discord.js
 │   └── slack.ts              Slack via @slack/bolt
-├── gateway.ts                HTTP + WebSocket server
-├── gateway-methods.ts        21 JSON-RPC handlers
-├── gateway-http.ts           OpenAI-compatible HTTP endpoints
+├── gateway.ts                HTTP + WebSocket server, presence system, webhook endpoint
+├── gateway-methods.ts        23 JSON-RPC handlers
+├── gateway-http.ts           OpenAI-compatible HTTP endpoints + WebChat route
 ├── multi-agent.ts            Agent spawn, A2A messaging, bindings
 ├── memory.ts                 SQLite + FTS5 + vector search
 ├── browser.ts                Chrome/CDP automation
 ├── cron.ts                   Job scheduler with 5-field cron expression parser
 ├── tts.ts                    Edge/OpenAI/ElevenLabs TTS
 ├── media.ts                  Image/audio processing, AI vision
-├── tools/                    17 agent tool implementations
+├── tools/                    Web search/fetch + 17 agent tool implementations
 └── plugins/                  33 bundled plugin stubs
 ```
 
