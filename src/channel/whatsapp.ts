@@ -3,7 +3,7 @@
 
 import crypto from "node:crypto";
 import type { TinyClawConfig } from "../config/schema.js";
-import type { ChannelAdapter, ChannelCapabilities, ChannelInstance, InboundMessage } from "../channel.js";
+import type { ChannelAdapter, ChannelCapabilities, ChannelInstance, InboundMessage } from "./channel.js";
 import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════

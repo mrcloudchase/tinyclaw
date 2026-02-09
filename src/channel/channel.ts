@@ -1,9 +1,9 @@
 // Channel System — Types + capabilities + registry + lifecycle
 // All in ONE file
 
-import type { TinyClawConfig } from "./config/schema.js";
-import { log } from "./utils/logger.js";
-import { runHooks } from "./hooks/hooks.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import { log } from "../utils/logger.js";
+import { runHooks } from "../hooks/hooks.js";
 
 // ══════════════════════════════════════════════
 // ── Channel Adapter Interface (23 adapter slots) ──
@@ -154,7 +154,7 @@ export async function initChannels(config: TinyClawConfig, registry: ChannelRegi
   // WhatsApp
   if (config.channels?.whatsapp?.enabled) {
     try {
-      const { createWhatsAppChannel } = await import("./channel/whatsapp.js");
+      const { createWhatsAppChannel } = await import("./whatsapp.js");
       const accounts = config.channels.whatsapp.accounts ?? {};
       for (const [accountId, accountConfig] of Object.entries(accounts)) {
         const ch = createWhatsAppChannel(accountId, accountConfig, config);
@@ -168,7 +168,7 @@ export async function initChannels(config: TinyClawConfig, registry: ChannelRegi
   // Telegram
   if (config.channels?.telegram?.enabled) {
     try {
-      const { createTelegramChannel } = await import("./channel/telegram.js");
+      const { createTelegramChannel } = await import("./telegram.js");
       const telegramConfig = config.channels.telegram;
       const botToken = telegramConfig.botToken
         ?? (telegramConfig.botTokenEnv ? process.env[telegramConfig.botTokenEnv] : undefined)
@@ -188,7 +188,7 @@ export async function initChannels(config: TinyClawConfig, registry: ChannelRegi
   // Discord
   if (config.channels?.discord?.enabled) {
     try {
-      const { createDiscordChannel } = await import("./channel/discord.js");
+      const { createDiscordChannel } = await import("./discord.js");
       const discordConfig = config.channels.discord;
       const botToken = discordConfig.botToken
         ?? (discordConfig.botTokenEnv ? process.env[discordConfig.botTokenEnv] : undefined)
@@ -208,7 +208,7 @@ export async function initChannels(config: TinyClawConfig, registry: ChannelRegi
   // Slack
   if (config.channels?.slack?.enabled) {
     try {
-      const { createSlackChannel } = await import("./channel/slack.js");
+      const { createSlackChannel } = await import("./slack.js");
       const slackConfig = config.channels.slack;
       const botToken = slackConfig.botToken
         ?? (slackConfig.botTokenEnv ? process.env[slackConfig.botTokenEnv] : undefined)

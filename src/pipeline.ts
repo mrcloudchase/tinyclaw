@@ -2,7 +2,7 @@
 // All in ONE file
 
 import type { TinyClawConfig } from "./config/schema.js";
-import type { ChannelAdapter, ChannelInstance } from "./channel.js";
+import type { ChannelAdapter, ChannelInstance } from "./channel/channel.js";
 import type { TinyClawSession } from "./agent/session.js";
 import type { HookFn } from "./agent/runner.js";
 import { runAgent } from "./agent/runner.js";

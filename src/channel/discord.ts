@@ -8,7 +8,7 @@ import {
   type Message as DiscordMessage,
 } from "discord.js";
 import type { TinyClawConfig } from "../config/schema.js";
-import type { ChannelAdapter, ChannelCapabilities, ChannelInstance, InboundMessage } from "../channel.js";
+import type { ChannelAdapter, ChannelCapabilities, ChannelInstance, InboundMessage } from "./channel.js";
 import { dispatch } from "../pipeline.js";
 import { log } from "../utils/logger.js";
 

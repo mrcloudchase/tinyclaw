@@ -10,7 +10,7 @@ export function createMessageTools(config: TinyClawConfig): AgentTool<any>[] {
       parameters: { type: "object", properties: { channel: { type: "string" }, to: { type: "string" }, text: { type: "string" }, accountId: { type: "string" } }, required: ["channel", "to", "text"] },
       async execute(args: { channel: string; to: string; text: string; accountId?: string }) {
         try {
-          const { getChannelRegistry } = await import("../channel.js");
+          const { getChannelRegistry } = await import("../channel/channel.js");
           const reg = getChannelRegistry();
           const ch = reg.get(args.channel);
           if (!ch) return `Channel "${args.channel}" not found.`;
@@ -25,7 +25,7 @@ export function createMessageTools(config: TinyClawConfig): AgentTool<any>[] {
       parameters: { type: "object", properties: { channel: { type: "string" }, messageId: { type: "string" }, emoji: { type: "string" } }, required: ["channel", "messageId", "emoji"] },
       async execute(args: { channel: string; messageId: string; emoji: string }) {
         try {
-          const { getChannelRegistry } = await import("../channel.js");
+          const { getChannelRegistry } = await import("../channel/channel.js");
           const ch = getChannelRegistry().get(args.channel);
           if (!ch?.adapter.sendReaction) return "Reactions not supported.";
           await ch.adapter.sendReaction(args.messageId, args.emoji);
@@ -39,7 +39,7 @@ export function createMessageTools(config: TinyClawConfig): AgentTool<any>[] {
       parameters: { type: "object", properties: { channel: { type: "string" }, to: { type: "string" } }, required: ["channel", "to"] },
       async execute(args: { channel: string; to: string }) {
         try {
-          const { getChannelRegistry } = await import("../channel.js");
+          const { getChannelRegistry } = await import("../channel/channel.js");
           const ch = getChannelRegistry().get(args.channel);
           if (!ch?.adapter.sendTyping) return "Typing not supported.";
           await ch.adapter.sendTyping(args.to);

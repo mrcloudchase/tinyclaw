@@ -28,7 +28,7 @@ export { evaluatePolicy, ssrfCheck, detectInjection, wrapUntrustedContent, sanit
 export { dispatch, chunkReply, createDebouncer, clearSession, getActiveSessionKeys, type MsgContext, type PipelineResult } from "./pipeline.js";
 
 // Channels
-export { createChannelRegistry, getChannelRegistry, initChannels, shutdownChannels, type ChannelAdapter, type ChannelCapabilities, type ChannelInstance, type ChannelRegistry, type InboundMessage } from "./channel.js";
+export { createChannelRegistry, getChannelRegistry, initChannels, shutdownChannels, type ChannelAdapter, type ChannelCapabilities, type ChannelInstance, type ChannelRegistry, type InboundMessage } from "./channel/channel.js";
 
 // Gateway
 export { startGateway, stopGateway, type GatewayContext, type PresenceEntry } from "./gateway.js";
