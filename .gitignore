@@ -3,3 +3,4 @@ dist/
 .env
 *.jsonl
 .DS_Store
+coverage/
