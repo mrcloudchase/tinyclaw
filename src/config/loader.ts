@@ -12,39 +12,26 @@ const ENV_KEY_MAP: Record<string, string> = {
 };
 
 function mergeEnvVars(config: TinyClawConfig): TinyClawConfig {
-  // Override model from env
   const envModel = process.env.TINYCLAW_MODEL?.trim();
   if (envModel) {
     const [provider, ...rest] = envModel.split("/");
     const modelId = rest.join("/");
-    if (provider && modelId) {
-      config.agent = { ...config.agent!, provider, model: modelId };
-    }
+    if (provider && modelId) config.agent = { ...config.agent!, provider, model: modelId };
   }
-
-  // Override workspace from env
   const envWorkspace = process.env.TINYCLAW_WORKSPACE?.trim();
-  if (envWorkspace) {
-    config.workspace = { ...config.workspace, dir: envWorkspace };
+  if (envWorkspace) config.workspace = { ...config.workspace, dir: envWorkspace };
+  const envPort = process.env.TINYCLAW_PORT?.trim();
+  if (envPort) {
+    const gw = config.gateway ?? { mode: "local" as const, port: 18789, bind: "loopback" as const };
+    config.gateway = { ...gw, port: parseInt(envPort, 10) };
   }
-
   return config;
 }
 
 function writeDefaultConfig(configPath: string): void {
-  const content = JSON5.stringify(
-    {
-      // TinyClaw configuration
-      // See: https://github.com/mrcloudchase/tinyclaw
-      agent: {
-        provider: "anthropic",
-        model: "claude-sonnet-4-5-20250929",
-        thinkingLevel: "off",
-      },
-    },
-    null,
-    2,
-  );
+  const content = JSON5.stringify({
+    agent: { provider: "anthropic", model: "claude-sonnet-4-5-20250929", thinkingLevel: "off" },
+  }, null, 2);
   ensureDir(path.dirname(configPath));
   fs.writeFileSync(configPath, content, "utf-8");
   log.info(`Created default config at ${configPath}`);
@@ -52,16 +39,12 @@ function writeDefaultConfig(configPath: string): void {
 
 export function loadConfig(overridePath?: string): TinyClawConfig {
   const configPath = overridePath || resolveConfigFilePath();
-
-  // Ensure config directory exists
   ensureDir(resolveConfigDir());
 
   let raw: Record<string, unknown> = {};
-
   if (fs.existsSync(configPath)) {
     try {
-      const content = fs.readFileSync(configPath, "utf-8");
-      raw = JSON5.parse(content) as Record<string, unknown>;
+      raw = JSON5.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     } catch (err) {
       log.warn(`Failed to parse config at ${configPath}: ${err}`);
     }
@@ -69,29 +52,40 @@ export function loadConfig(overridePath?: string): TinyClawConfig {
     writeDefaultConfig(configPath);
   }
 
-  // Validate with Zod
   const result = TinyClawConfigSchema.safeParse(raw);
   if (!result.success) {
     log.warn(`Config validation issues: ${result.error.message}`);
-    // Fall back to defaults with what we can salvage
     const partial = TinyClawConfigSchema.partial().safeParse(raw);
     return mergeEnvVars({ ...DEFAULT_CONFIG, ...(partial.success ? partial.data : {}) });
   }
-
   return mergeEnvVars({ ...DEFAULT_CONFIG, ...result.data });
 }
 
 export function resolveApiKeyFromEnv(provider: string): string | undefined {
-  // Direct provider env var
   const envVar = ENV_KEY_MAP[provider];
-  if (envVar) {
-    const value = process.env[envVar]?.trim();
-    if (value) return value;
-  }
-
-  // Generic fallback
+  if (envVar) { const v = process.env[envVar]?.trim(); if (v) return v; }
   const generic = process.env[`${provider.toUpperCase()}_API_KEY`]?.trim();
-  if (generic) return generic;
+  return generic || undefined;
+}
 
-  return undefined;
+// Hot-reload config watcher
+export function watchConfig(
+  configPath: string | undefined,
+  onChange: (config: TinyClawConfig) => void,
+): { close(): void } {
+  const filePath = configPath || resolveConfigFilePath();
+  let debounce: ReturnType<typeof setTimeout> | undefined;
+  const watcher = fs.watch(filePath, () => {
+    if (debounce) clearTimeout(debounce);
+    debounce = setTimeout(() => {
+      try {
+        const updated = loadConfig(filePath);
+        onChange(updated);
+        log.info("Config reloaded");
+      } catch (err) {
+        log.warn(`Config reload failed: ${err}`);
+      }
+    }, 2000);
+  });
+  return { close: () => watcher.close() };
 }

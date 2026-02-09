@@ -3,6 +3,8 @@ import type { AgentSession, AgentSessionEvent } from "@mariozechner/pi-coding-ag
 import type { TinyClawConfig } from "../config/schema.js";
 import { createTinyClawSession, type TinyClawSession } from "./session.js";
 import { compactSession } from "./compact.js";
+import { buildFallbackChain, resolveNextFallback } from "../model/resolve.js";
+import { markKeyFailed, markKeySuccess } from "../auth/keys.js";
 import {
   isContextOverflowError,
   isAuthError,
@@ -12,46 +14,26 @@ import {
 import { log } from "../util/logger.js";
 
 export interface RunOptions {
-  /** Callback for streaming text chunks */
   onText?: (text: string) => void;
-  /** Callback for tool execution events */
-  onToolEvent?: (event: {
-    type: "start" | "end";
-    toolName: string;
-    input?: string;
-    output?: string;
-  }) => void;
-  /** Callback for session events */
+  onToolEvent?: (event: { type: "start" | "end"; toolName: string; input?: string; output?: string }) => void;
   onEvent?: (event: AgentSessionEvent) => void;
-  /** Abort signal for cancellation */
   abortSignal?: AbortSignal;
-  /** Force new session (delete existing) */
   forceNew?: boolean;
-  /** Use ephemeral (in-memory) session */
   ephemeral?: boolean;
 }
 
 export interface RunResult {
-  /** The final assistant response text */
   text: string;
-  /** Whether compaction was triggered */
   compacted: boolean;
-  /** Session reference for follow-up prompts */
   tinyClawSession: TinyClawSession;
 }
+
+// Hook points for pipeline integration
+export type HookFn = (event: string, data: Record<string, unknown>) => Promise<void>;
 
 const MAX_RETRIES = 3;
 const THINKING_FALLBACK: ThinkingLevel[] = ["high", "medium", "low", "off"];
 
-/**
- * Runs a single agent turn with error recovery.
- *
- * Handles:
- * - Context overflow → compact & retry
- * - Auth errors → report (no rotation yet)
- * - Rate limits → exponential backoff & retry
- * - Thinking level errors → downgrade & retry
- */
 export async function runAgent(params: {
   config: TinyClawConfig;
   prompt: string;
@@ -61,46 +43,37 @@ export async function runAgent(params: {
   modelId?: string;
   thinkingLevel?: ThinkingLevel;
   options?: RunOptions;
-  /** Reuse existing session for multi-turn */
   existingSession?: TinyClawSession;
+  hooks?: HookFn;
 }): Promise<RunResult> {
-  const {
-    config,
-    prompt,
-    sessionName,
-    workspaceDir,
-    options = {},
-  } = params;
+  const { config, prompt, sessionName, workspaceDir, options = {}, hooks } = params;
 
   let compacted = false;
-  let thinkingLevel: ThinkingLevel =
-    params.thinkingLevel ?? (config.agent?.thinkingLevel as ThinkingLevel) ?? "off";
+  let thinkingLevel: ThinkingLevel = params.thinkingLevel ?? (config.agent?.thinkingLevel as ThinkingLevel) ?? "off";
   let tinyClawSession: TinyClawSession;
+  const fallbackChain = buildFallbackChain(config);
+  let fallbackIdx = 0;
 
-  // Create or reuse session
+  // Fire pre-run hook
+  await hooks?.("pre_run", { prompt, sessionName });
+
   if (params.existingSession) {
     tinyClawSession = params.existingSession;
   } else {
     tinyClawSession = await createTinyClawSession({
-      config,
-      sessionName,
-      workspaceDir,
-      provider: params.provider,
-      modelId: params.modelId,
-      thinkingLevel,
-      ephemeral: options.ephemeral,
+      config, sessionName, workspaceDir,
+      provider: params.provider, modelId: params.modelId,
+      thinkingLevel, ephemeral: options.ephemeral,
     });
   }
 
   const { session } = tinyClawSession;
 
-  // Subscribe to events for streaming
   let responseText = "";
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     options.onEvent?.(event);
 
     if (event.type === "message_update") {
-      // Extract text deltas from the assistant message event stream
       const ame = event.assistantMessageEvent;
       if (ame.type === "text_delta") {
         responseText += ame.delta;
@@ -109,50 +82,33 @@ export async function runAgent(params: {
     }
 
     if (event.type === "tool_execution_start") {
-      options.onToolEvent?.({
-        type: "start",
-        toolName: event.toolName,
-        input: JSON.stringify(event.args),
-      });
+      options.onToolEvent?.({ type: "start", toolName: event.toolName, input: JSON.stringify(event.args) });
     }
 
     if (event.type === "tool_execution_end") {
-      options.onToolEvent?.({
-        type: "end",
-        toolName: event.toolName,
-        output: event.result
-          ? String(event.result).slice(0, 500)
-          : undefined,
-      });
+      options.onToolEvent?.({ type: "end", toolName: event.toolName, output: event.result ? String(event.result).slice(0, 500) : undefined });
     }
 
-    if (event.type === "auto_compaction_start") {
-      log.info("Auto-compaction triggered...");
-      compacted = true;
-    }
-
-    if (event.type === "auto_compaction_end") {
-      if (event.result) {
-        log.info(
-          `Auto-compaction done: ${event.result.tokensBefore} tokens compacted`,
-        );
-      }
+    if (event.type === "auto_compaction_start") { log.info("Auto-compaction triggered..."); compacted = true; }
+    if (event.type === "auto_compaction_end" && event.result) {
+      log.info(`Auto-compaction done: ${event.result.tokensBefore} tokens compacted`);
     }
   });
 
-  // Retry loop
   let retries = 0;
   try {
     while (retries <= MAX_RETRIES) {
       try {
         responseText = "";
         await session.prompt(prompt);
+        // Mark key as successful
+        markKeySuccess(tinyClawSession.resolved.provider, tinyClawSession.resolved.modelId);
+        await hooks?.("post_run", { prompt, response: responseText });
         return { text: responseText, compacted, tinyClawSession };
       } catch (error) {
-        if (options.abortSignal?.aborted) {
-          throw new Error("Aborted");
-        }
+        if (options.abortSignal?.aborted) throw new Error("Aborted");
 
+        // Context overflow → compact & retry
         if (isContextOverflowError(error) && retries < MAX_RETRIES) {
           log.warn("Context overflow, compacting...");
           await compactSession(session);
@@ -161,20 +117,44 @@ export async function runAgent(params: {
           continue;
         }
 
+        // Rate limit → backoff & retry
         if (isRateLimitError(error) && retries < MAX_RETRIES) {
           const delayMs = Math.min(1000 * Math.pow(2, retries), 30000);
-          const jitter = Math.random() * delayMs * 0.1;
           log.warn(`Rate limited, waiting ${Math.round(delayMs / 1000)}s...`);
-          await new Promise((r) => setTimeout(r, delayMs + jitter));
+          await new Promise((r) => setTimeout(r, delayMs + Math.random() * delayMs * 0.1));
           retries++;
           continue;
         }
 
+        // Auth error → mark key failed, try fallback model
         if (isAuthError(error)) {
-          throw new Error(
-            `Authentication failed for provider "${params.provider ?? config.agent?.provider}". ` +
-              `Check your API key. ${describeError(error)}`,
-          );
+          markKeyFailed(tinyClawSession.resolved.provider, tinyClawSession.resolved.modelId);
+          const next = resolveNextFallback(fallbackIdx, fallbackChain, config);
+          if (next && fallbackIdx < fallbackChain.length - 1) {
+            fallbackIdx++;
+            log.warn(`Auth failed, falling back to ${next.provider}/${next.modelId}`);
+            // Recreate session with fallback model
+            tinyClawSession = await createTinyClawSession({
+              config, sessionName, workspaceDir,
+              provider: next.provider, modelId: next.modelId,
+              thinkingLevel, ephemeral: options.ephemeral,
+            });
+            retries++;
+            continue;
+          }
+          throw new Error(`Authentication failed for provider "${tinyClawSession.resolved.provider}". Check your API key. ${describeError(error)}`);
+        }
+
+        // Thinking level error → downgrade
+        const errMsg = describeError(error).toLowerCase();
+        if (errMsg.includes("thinking") && retries < MAX_RETRIES) {
+          const currentIdx = THINKING_FALLBACK.indexOf(thinkingLevel);
+          if (currentIdx < THINKING_FALLBACK.length - 1) {
+            thinkingLevel = THINKING_FALLBACK[currentIdx + 1];
+            log.warn(`Thinking level error, downgrading to ${thinkingLevel}`);
+            retries++;
+            continue;
+          }
         }
 
         throw error;

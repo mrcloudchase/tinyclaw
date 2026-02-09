@@ -6,7 +6,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import type { TinyClawConfig } from "../config/schema.js";
-import { resolveModel, type ResolvedModel } from "../model/resolve.js";
+import { resolveModel, resolveAlias, type ResolvedModel } from "../model/resolve.js";
 import { assembleTinyClawTools } from "./tools.js";
 import { buildSystemPrompt, loadBootstrapContent } from "./system-prompt.js";
 import { resolveSessionFile, resolveSessionsDir, ensureDir } from "../config/paths.js";
@@ -17,11 +17,52 @@ export interface TinyClawSession {
   resolved: ResolvedModel;
   sessionManager: SessionManager;
   extensionsResult: CreateAgentSessionResult["extensionsResult"];
+  agentId?: string;
 }
 
-/**
- * Creates a fully wired TinyClaw agent session using pi-coding-agent.
- */
+// ── Multi-Agent Session Key Parsing ──
+// Format: "agentId:channelId:accountId:peerId" or just "sessionName"
+export interface SessionKey {
+  agentId?: string;
+  channelId?: string;
+  accountId?: string;
+  peerId?: string;
+  raw: string;
+}
+
+export function parseSessionKey(input: string): SessionKey {
+  const parts = input.split(":");
+  if (parts.length >= 4) {
+    return { agentId: parts[0], channelId: parts[1], accountId: parts[2], peerId: parts[3], raw: input };
+  }
+  if (parts.length >= 2) {
+    return { agentId: parts[0], channelId: parts[1], raw: input };
+  }
+  return { raw: input };
+}
+
+export function buildSessionKey(agentId: string, channelId: string, accountId: string, peerId: string): string {
+  return `${agentId}:${channelId}:${accountId}:${peerId}`;
+}
+
+// ── Resolve Agent Binding ──
+export function resolveAgentForChannel(
+  config: TinyClawConfig,
+  channelId: string,
+  accountId?: string,
+  peerId?: string,
+): string | undefined {
+  const bindings = config.multiAgent?.bindings;
+  if (!bindings) return undefined;
+  for (const b of bindings) {
+    if (b.match?.channel && b.match.channel !== channelId) continue;
+    if (b.match?.accountId && b.match.accountId !== accountId) continue;
+    if (b.match?.peer && b.match.peer !== peerId) continue;
+    return b.agentId;
+  }
+  return undefined;
+}
+
 export async function createTinyClawSession(params: {
   config: TinyClawConfig;
   sessionName: string;
@@ -30,40 +71,38 @@ export async function createTinyClawSession(params: {
   modelId?: string;
   thinkingLevel?: ThinkingLevel;
   ephemeral?: boolean;
+  agentId?: string;
 }): Promise<TinyClawSession> {
-  const {
-    config,
-    sessionName,
-    workspaceDir,
-    ephemeral = false,
-  } = params;
+  const { config, sessionName, workspaceDir, ephemeral = false, agentId } = params;
 
-  const provider = params.provider ?? config.agent?.provider ?? "anthropic";
-  const modelId = params.modelId ?? config.agent?.model ?? "claude-sonnet-4-5-20250929";
-  const thinkingLevel: ThinkingLevel =
-    params.thinkingLevel ?? (config.agent?.thinkingLevel as ThinkingLevel) ?? "off";
+  // Resolve model (support aliases)
+  let provider = params.provider ?? config.agent?.provider ?? "anthropic";
+  let modelId = params.modelId ?? config.agent?.model ?? "claude-sonnet-4-5-20250929";
 
-  // Resolve model and auth
+  // Check for agent-specific model override
+  if (agentId && config.multiAgent?.agents) {
+    const agentDef = config.multiAgent.agents.find((a) => a.id === agentId);
+    if (agentDef?.model) {
+      const m = typeof agentDef.model === "string" ? resolveAlias(agentDef.model) : resolveAlias(agentDef.model.primary ?? modelId);
+      provider = m.provider;
+      modelId = m.modelId;
+    }
+  }
+
+  const thinkingLevel: ThinkingLevel = params.thinkingLevel ?? (config.agent?.thinkingLevel as ThinkingLevel) ?? "off";
   const resolved = resolveModel(provider, modelId, config);
-
-  // Assemble tools
   const { builtinTools, customTools } = assembleTinyClawTools(workspaceDir, config);
 
-  // Session manager
   let sessionManager: SessionManager;
   if (ephemeral) {
     sessionManager = SessionManager.inMemory();
   } else {
     ensureDir(resolveSessionsDir());
-    const sessionFile = resolveSessionFile(sessionName);
-    sessionManager = SessionManager.open(sessionFile);
+    sessionManager = SessionManager.open(resolveSessionFile(sessionName));
   }
 
-  log.debug(
-    `Creating session: provider=${provider} model=${modelId} thinking=${thinkingLevel}`,
-  );
+  log.debug(`Creating session: provider=${provider} model=${modelId} thinking=${thinkingLevel}${agentId ? ` agent=${agentId}` : ""}`);
 
-  // Create the agent session via pi-coding-agent
   const result = await createAgentSession({
     cwd: workspaceDir,
     model: resolved.model,
@@ -76,12 +115,9 @@ export async function createTinyClawSession(params: {
   });
 
   const { session, extensionsResult, modelFallbackMessage } = result;
+  if (modelFallbackMessage) log.warn(modelFallbackMessage);
 
-  if (modelFallbackMessage) {
-    log.warn(modelFallbackMessage);
-  }
-
-  // Build and set system prompt
+  // Build system prompt with full context
   const bootstrapContent = loadBootstrapContent(workspaceDir);
   const toolNames = builtinTools.map((t) => t.name);
   const systemPrompt = buildSystemPrompt({
@@ -89,14 +125,11 @@ export async function createTinyClawSession(params: {
     toolNames,
     model: `${provider}/${modelId}`,
     thinkingLevel,
+    config,
     bootstrapContent,
+    agentId,
   });
   session.agent.setSystemPrompt(systemPrompt);
 
-  return {
-    session,
-    resolved,
-    sessionManager,
-    extensionsResult,
-  };
+  return { session, resolved, sessionManager, extensionsResult, agentId };
 }
