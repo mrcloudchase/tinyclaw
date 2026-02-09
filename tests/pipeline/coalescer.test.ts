@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-import { createCoalescer, CHANNEL_TEXT_LIMITS } from "./coalescer.js";
+import { createCoalescer, CHANNEL_TEXT_LIMITS } from "../../src/pipeline/coalescer.js";
 
 describe("CHANNEL_TEXT_LIMITS", () => {
   it("has correct per-channel limits", () => {

@@ -5,7 +5,7 @@ import {
   isRateLimitError,
   isTimeoutError,
   describeError,
-} from "./errors.js";
+} from "../../src/utils/errors.js";
 
 describe("isContextOverflowError", () => {
   it("detects context_length_exceeded", () => {

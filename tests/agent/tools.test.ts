@@ -11,21 +11,21 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   ]),
 }));
 
-vi.mock("../exec/exec-tool.js", () => ({
+vi.mock("../../src/exec/exec-tool.js", () => ({
   createExecTool: vi.fn(() => ({ name: "bash", execute: vi.fn() })),
 }));
 
-vi.mock("../tools/web.js", () => ({
+vi.mock("../../src/tools/web.js", () => ({
   createWebSearchTool: vi.fn(() => ({ name: "web_search" })),
   createWebFetchTool: vi.fn(() => ({ name: "web_fetch" })),
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-import { normalizeToolParams, checkToolLimit } from "./tools.js";
-import type { TinyClawConfig } from "../config/schema.js";
+import { normalizeToolParams, checkToolLimit } from "../../src/agent/tools.js";
+import type { TinyClawConfig } from "../../src/config/schema.js";
 
 describe("normalizeToolParams", () => {
   it("maps file_path to path for read", () => {

@@ -7,16 +7,16 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("../config/paths.js", () => ({
+vi.mock("../../src/config/paths.js", () => ({
   resolveMediaDir: () => "/mock/.config/tinyclaw/media",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-import { detectMime, isImage, isAudio, isVideo, detectAudioFormat } from "./media.js";
+import { detectMime, isImage, isAudio, isVideo, detectAudioFormat } from "../../src/media/media.js";
 
 describe("detectMime", () => {
   it("detects image types", () => {

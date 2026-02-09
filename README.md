@@ -552,7 +552,7 @@ export default function init(api: TinyClawPluginApi) {
 
 ### 33 Plugin Slots
 
-The plugin system has 33 plugin slots defined in `src/plugins/`. **4 core channel adapters** are fully implemented and live in `src/channel/` (WhatsApp, Telegram, Discord, Slack). The remaining **29 slots are scaffold stubs** for future implementation:
+The plugin system has 33 plugin slots defined in `src/plugin/`. **4 core channel adapters** are fully implemented and live in `src/channel/` (WhatsApp, Telegram, Discord, Slack). The remaining **29 slots are scaffold stubs** for future implementation:
 
 **Channel stubs (14):** Signal, iMessage, Instagram, Messenger, Twitter/X, Matrix, Teams, LINE, WeChat, Viber, Rocket.Chat, Zulip, Webex, Google Chat
 
@@ -736,45 +736,30 @@ Checks: config file validity, API key presence, gateway connectivity, channel to
 
 ```
 src/
-├── cli.ts                    CLI + REPL + serve + init + pair + config/status/doctor/cron/logs
-├── index.ts                  Public API exports
-├── tui.ts                    TUI mode via pi-tui
-├── init.ts                   Interactive setup wizard
-├── webchat.ts                Embedded WebChat UI (self-contained HTML/CSS/JS)
+├── index.ts                  Public API exports (barrel)
+├── agent/                    Session, runner, tools, system prompt, compact, pruning, multi-agent
+├── auth/                     Multi-key rotation with backoff + persistent cooldowns
+├── browser/                  Chrome/CDP automation via playwright-core
+├── channel/                  Channel adapter interface, registry, lifecycle + adapters (WhatsApp, Telegram, Discord, Slack)
+├── cli/                      CLI + REPL + serve + subcommands, interactive setup wizard (init)
 ├── config/                   Zod schemas, loader, paths, watcher
-├── agent/                    Session (locking, repair), runner, tools, system prompt, compact, pruning
-├── auth/keys.ts              Multi-key rotation with backoff + persistent cooldowns
-├── model/resolve.ts          Aliases, fallback chains, local provider auto-detection
+├── cron/                     Job scheduler with 5-field cron expression parser
 ├── exec/                     Shell execution (with sandbox routing)
-├── util/                     Logger, errors
-├── security.ts               10-layer policy, SSRF, injection detection, exec allowlist
-├── sandbox.ts                Docker container management
-├── pairing.ts                DM pairing store and allow-list
-├── plugin.ts                 Plugin API, registry, 4-origin loader
-├── hooks.ts                  14 event types, hook runner with transform/abort, bundled hooks
-├── skills.ts                 Skill discovery, formatting, and command execution
-├── pipeline.ts               Message dispatch, dedup, collect mode, directives, commands, chunking, delivery
-├── pipeline/
-│   └── coalescer.ts          Block streaming coalescer with code block awareness
-├── memory/
-│   └── embeddings.ts         OpenAI embedding generation with caching
-├── channel.ts                Channel adapter interface, registry, lifecycle
-├── channel/
-│   ├── whatsapp.ts           WhatsApp Cloud API
-│   ├── telegram.ts           Telegram via grammY
-│   ├── discord.ts            Discord via discord.js
-│   └── slack.ts              Slack via @slack/bolt
-├── gateway.ts                HTTP + WebSocket server, presence system, webhook endpoint
-├── gateway-methods.ts        23 JSON-RPC handlers
-├── gateway-http.ts           OpenAI-compatible HTTP endpoints + WebChat route
-├── multi-agent.ts            Agent spawn, A2A messaging, bindings
-├── memory.ts                 SQLite + FTS5 + vector search
-├── browser.ts                Chrome/CDP automation
-├── cron.ts                   Job scheduler with 5-field cron expression parser
-├── tts.ts                    Edge/OpenAI/ElevenLabs TTS
-├── media.ts                  Image/audio processing, AI vision
+├── gateway/                  HTTP + WebSocket server, JSON-RPC methods, OpenAI-compatible endpoints, WebChat UI
+├── hooks/                    14 event types, hook runner with transform/abort, bundled hooks
+├── media/                    Image/audio processing, AI vision, MIME detection
+├── memory/                   SQLite + FTS5 + vector search, OpenAI embeddings
+├── model/                    Aliases, fallback chains, local provider auto-detection
+├── pipeline/                 Message dispatch, dedup, collect mode, directives, chunking, coalescer
+├── plugin/                   Plugin API, registry, 4-origin loader, 33 plugin slots
+├── sandbox/                  Docker container management
+├── security/                 10-layer policy, SSRF, injection detection, exec allowlist, DM pairing
+├── skills/                   Skill discovery, formatting, and command execution
 ├── tools/                    Web search/fetch + 17 agent tool implementations
-└── plugins/                  33 plugin slots (TODO stubs)
+├── tts/                      Edge/OpenAI/ElevenLabs TTS
+├── tui/                      TUI mode via pi-tui
+└── utils/                    Logger, errors
+tests/                        All test files (mirroring src/ structure)
 ```
 
 ## Development
@@ -790,7 +775,7 @@ npm run typecheck
 npm run build
 
 # Run from source
-npx tsx src/cli.ts "Hello"
+npx tsx src/cli/cli.ts "Hello"
 
 # Run tests
 npm test

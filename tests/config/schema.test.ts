@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TinyClawConfigSchema, DEFAULT_CONFIG } from "./schema.js";
+import { TinyClawConfigSchema, DEFAULT_CONFIG } from "../../src/config/schema.js";
 
 describe("TinyClawConfigSchema", () => {
   it("parses empty object with defaults", () => {

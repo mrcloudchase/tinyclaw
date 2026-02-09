@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-vi.mock("./session.js", () => ({
+vi.mock("../../src/agent/session.js", () => ({
   createTinyClawSession: vi.fn(),
   parseSessionKey: vi.fn((input: string) => {
     const parts = input.split(":");
@@ -15,12 +15,12 @@ vi.mock("./session.js", () => ({
   resolveAgentForChannel: vi.fn(() => undefined),
 }));
 
-vi.mock("./runner.js", () => ({
+vi.mock("../../src/agent/runner.js", () => ({
   runAgent: vi.fn(),
 }));
 
-import { listAgents, removeAgent, clearAllAgents, resolveAgentBinding } from "./multi-agent.js";
-import type { TinyClawConfig } from "../config/schema.js";
+import { listAgents, removeAgent, clearAllAgents, resolveAgentBinding } from "../../src/agent/multi-agent.js";
+import type { TinyClawConfig } from "../../src/config/schema.js";
 
 describe("agent registry", () => {
   it("lists agents (initially empty)", () => {

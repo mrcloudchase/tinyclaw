@@ -16,7 +16,7 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("../config/paths.js", () => ({
+vi.mock("../../src/config/paths.js", () => ({
   resolveConfigDir: () => "/mock/.config/tinyclaw",
   resolveSessionsDir: () => "/mock/.config/tinyclaw/sessions",
   resolveSessionFile: (name: string) => `/mock/.config/tinyclaw/sessions/${name}.jsonl`,
@@ -24,11 +24,11 @@ vi.mock("../config/paths.js", () => ({
   ensureDir: vi.fn(),
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-vi.mock("../model/resolve.js", () => ({
+vi.mock("../../src/model/resolve.js", () => ({
   resolveModel: vi.fn(() => ({
     model: { id: "test", name: "test", provider: "test" },
     authStorage: {},
@@ -45,7 +45,7 @@ vi.mock("../model/resolve.js", () => ({
   }),
 }));
 
-vi.mock("./tools.js", () => ({
+vi.mock("../../src/agent/tools.js", () => ({
   assembleTinyClawTools: vi.fn(() => ({
     builtinTools: [{ name: "read" }],
     customTools: [],
@@ -78,8 +78,8 @@ import {
   buildSessionKey,
   resolveAgentForChannel,
   repairSessionFileIfNeeded,
-} from "./session.js";
-import type { TinyClawConfig } from "../config/schema.js";
+} from "../../src/agent/session.js";
+import type { TinyClawConfig } from "../../src/config/schema.js";
 
 describe("parseSessionKey", () => {
   it("parses full 4-part key", () => {

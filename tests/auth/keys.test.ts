@@ -9,17 +9,17 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("../config/paths.js", () => ({
+vi.mock("../../src/config/paths.js", () => ({
   resolveConfigDir: () => "/mock/.config/tinyclaw",
   resolveAgentDir: () => "/mock/.config/tinyclaw/agent",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("../config/loader.js", () => ({
+vi.mock("../../src/config/loader.js", () => ({
   resolveApiKeyFromEnv: vi.fn(() => undefined),
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
@@ -30,7 +30,7 @@ import {
   markKeySuccess,
   getKeyPoolHealth,
   loadKeysFromEnv,
-} from "./keys.js";
+} from "../../src/auth/keys.js";
 
 describe("classifyFailoverReason", () => {
   it("classifies 402 as billing", () => {

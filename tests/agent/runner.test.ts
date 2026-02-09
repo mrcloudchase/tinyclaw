@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 // complex session setup, so we test the exported constants and error routing logic
 describe("runner constants", () => {
   it("exports RunOptions and RunResult types", async () => {
-    const mod = await import("./runner.js");
+    const mod = await import("../../src/agent/runner.js");
     expect(mod.runAgent).toBeDefined();
     expect(typeof mod.runAgent).toBe("function");
   });

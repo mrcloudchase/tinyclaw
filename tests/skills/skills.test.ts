@@ -9,18 +9,18 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("../config/paths.js", () => ({
+vi.mock("../../src/config/paths.js", () => ({
   resolveConfigDir: () => "/mock/.config/tinyclaw",
   resolveSkillsDir: () => "/mock/.config/tinyclaw/skills",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
 import fs from "node:fs";
-import { loadSkillsFromDir, formatSkillsForPrompt, executeSkillCommand, type Skill } from "./skills.js";
+import { loadSkillsFromDir, formatSkillsForPrompt, executeSkillCommand, type Skill } from "../../src/skills/skills.js";
 
 describe("loadSkillsFromDir", () => {
   it("returns empty array for non-existent directory", () => {

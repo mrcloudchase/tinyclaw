@@ -10,18 +10,18 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("./paths.js", () => ({
+vi.mock("../../src/config/paths.js", () => ({
   resolveConfigDir: () => "/mock/.config/tinyclaw",
   resolveConfigFilePath: () => "/mock/.config/tinyclaw/config.json5",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
 import fs from "node:fs";
-import { loadConfig, resolveApiKeyFromEnv } from "./loader.js";
+import { loadConfig, resolveApiKeyFromEnv } from "../../src/config/loader.js";
 
 describe("loadConfig", () => {
   beforeEach(() => {

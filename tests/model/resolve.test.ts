@@ -9,19 +9,19 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("../config/paths.js", () => ({
+vi.mock("../../src/config/paths.js", () => ({
   resolveConfigDir: () => "/mock/.config/tinyclaw",
   resolveAgentDir: () => "/mock/.config/tinyclaw/agent",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("../auth/keys.js", () => ({
+vi.mock("../../src/auth/keys.js", () => ({
   resolveApiKey: vi.fn(() => "test-key"),
   setApiKeyOnAuthStorage: vi.fn(),
   loadKeysFromEnv: vi.fn(),
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
@@ -34,8 +34,8 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   })),
 }));
 
-import { resolveAlias, buildFallbackChain } from "./resolve.js";
-import type { TinyClawConfig } from "../config/schema.js";
+import { resolveAlias, buildFallbackChain } from "../../src/model/resolve.js";
+import type { TinyClawConfig } from "../../src/config/schema.js";
 
 describe("resolveAlias", () => {
   it("resolves 'sonnet' alias", () => {

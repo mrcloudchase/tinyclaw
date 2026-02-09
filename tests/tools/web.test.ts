@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-import { createWebSearchTool, createWebFetchTool } from "./web.js";
+import { createWebSearchTool, createWebFetchTool } from "../../src/tools/web.js";
 
 describe("createWebSearchTool", () => {
   const tool = createWebSearchTool() as any;

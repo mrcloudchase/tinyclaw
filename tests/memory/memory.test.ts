@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chunkText } from "./memory.js";
+import { chunkText } from "../../src/memory/memory.js";
 
 describe("chunkText", () => {
   it("returns single chunk for short text", () => {

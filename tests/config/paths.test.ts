@@ -18,7 +18,7 @@ import {
   resolveMemoryDir,
   resolveLogsDir,
   ensureDir,
-} from "./paths.js";
+} from "../../src/config/paths.js";
 
 describe("resolveConfigDir", () => {
   afterEach(() => {

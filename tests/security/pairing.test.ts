@@ -15,16 +15,16 @@ vi.mock("node:crypto", () => ({
   },
 }));
 
-vi.mock("../config/paths.js", () => ({
+vi.mock("../../src/config/paths.js", () => ({
   resolveConfigDir: () => "/mock/.config/tinyclaw",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../src/utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-import { PairingStore } from "./pairing.js";
+import { PairingStore } from "../../src/security/pairing.js";
 
 describe("PairingStore", () => {
   let store: PairingStore;
