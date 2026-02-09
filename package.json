@@ -4,7 +4,7 @@
   "description": "A minimal AI coding agent extracted from OpenClaw",
   "type": "module",
   "bin": {
-    "tinyclaw": "dist/cli.mjs"
+    "tinyclaw": "dist/cli/cli.mjs"
   },
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
@@ -13,8 +13,8 @@
   },
   "scripts": {
     "build": "tsdown",
-    "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.mjs",
+    "dev": "tsx src/cli/cli.ts",
+    "start": "node dist/cli/cli.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

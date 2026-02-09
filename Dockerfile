@@ -33,5 +33,5 @@ ENV NODE_ENV=production
 
 EXPOSE 18789
 
-ENTRYPOINT ["node", "dist/cli.mjs"]
+ENTRYPOINT ["node", "dist/cli/cli.mjs"]
 CMD ["serve"]

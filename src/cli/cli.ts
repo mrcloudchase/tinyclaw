@@ -3,11 +3,11 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { createInterface } from "node:readline/promises";
-import { loadConfig } from "./config/loader.js";
-import { runAgent, type RunResult } from "./agent/runner.js";
-import { compactSession } from "./agent/compact.js";
-import { setVerbose, setJsonMode, log } from "./utils/logger.js";
-import type { TinyClawSession } from "./agent/session.js";
+import { loadConfig } from "../config/loader.js";
+import { runAgent, type RunResult } from "../agent/runner.js";
+import { compactSession } from "../agent/compact.js";
+import { setVerbose, setJsonMode, log } from "../utils/logger.js";
+import type { TinyClawSession } from "../agent/session.js";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 
 const program = new Command()
@@ -75,7 +75,7 @@ program
     const port = config.gateway?.port ?? 18789;
 
     try {
-      const { startGateway } = await import("./gateway/gateway.js");
+      const { startGateway } = await import("../gateway/gateway.js");
       await startGateway(config);
       log.info(`TinyClaw gateway listening on port ${port}`);
     } catch (err) {
@@ -107,7 +107,7 @@ pairCmd
   .command("list")
   .description("Show pending pairing requests and allowed senders")
   .action(async () => {
-    const { getPairingStore } = await import("./security/pairing.js");
+    const { getPairingStore } = await import("../security/pairing.js");
     const store = getPairingStore();
     const pending = store.listPending();
     const allowed = store.listAllowed();
@@ -136,7 +136,7 @@ pairCmd
   .command("approve <code>")
   .description("Approve a pairing code")
   .action(async (code: string) => {
-    const { getPairingStore } = await import("./security/pairing.js");
+    const { getPairingStore } = await import("../security/pairing.js");
     const store = getPairingStore();
     const result = store.approveCode(code);
     if (result) {
@@ -150,7 +150,7 @@ pairCmd
   .command("revoke <peerId>")
   .description("Revoke access for a peer (format: channelId/peerId)")
   .action(async (peerArg: string) => {
-    const { getPairingStore } = await import("./security/pairing.js");
+    const { getPairingStore } = await import("../security/pairing.js");
     const store = getPairingStore();
     const [channelId, peerId] = peerArg.includes("/") ? peerArg.split("/", 2) : ["*", peerArg];
     if (channelId === "*") {
@@ -191,7 +191,7 @@ configCmd
   .description("Set a config value")
   .option("--config <path>", "Config file path override")
   .action(async (key: string, value: string, opts: any) => {
-    const { resolveConfigFilePath } = await import("./config/paths.js");
+    const { resolveConfigFilePath } = await import("../config/paths.js");
     const configPath = opts.config || resolveConfigFilePath();
     const fs = await import("node:fs");
     const JSON5 = (await import("json5")).default;
@@ -245,7 +245,7 @@ cronCmd
   .option("--config <path>", "Config file path override")
   .action(async (opts: any) => {
     const config = loadConfig(opts.config);
-    const { createCronStore } = await import("./cron/cron.js");
+    const { createCronStore } = await import("../cron/cron.js");
     const store = createCronStore(config);
     const jobs = store.list();
     if (jobs.length === 0) { console.log(chalk.dim("No cron jobs.")); return; }
@@ -261,7 +261,7 @@ cronCmd
   .option("--config <path>", "Config file path override")
   .action(async (schedule: string, prompt: string, opts: any) => {
     const config = loadConfig(opts.config);
-    const { createCronStore } = await import("./cron/cron.js");
+    const { createCronStore } = await import("../cron/cron.js");
     const store = createCronStore(config);
     const id = `job_${Date.now()}`;
     store.set({ id, name: opts.name ?? prompt.slice(0, 30), type: "cron", schedule, prompt, enabled: true, createdAt: Date.now() });
@@ -274,7 +274,7 @@ cronCmd
   .option("--config <path>", "Config file path override")
   .action(async (id: string, opts: any) => {
     const config = loadConfig(opts.config);
-    const { createCronStore } = await import("./cron/cron.js");
+    const { createCronStore } = await import("../cron/cron.js");
     const store = createCronStore(config);
     if (store.delete(id)) console.log(chalk.yellow(`Deleted: ${id}`));
     else console.log(chalk.dim("Job not found."));
@@ -358,7 +358,7 @@ program
   .description("Tail gateway logs")
   .option("--lines <n>", "Number of lines", "50")
   .action(async (opts) => {
-    const { resolveLogsDir } = await import("./config/paths.js");
+    const { resolveLogsDir } = await import("../config/paths.js");
     const fs = await import("node:fs");
     const path = await import("node:path");
     const logsDir = resolveLogsDir();
@@ -411,7 +411,7 @@ async function runInteractive(
   // Try TUI mode first (unless --no-tui)
   if (!opts.noTui) {
     try {
-      const { startTui } = await import("./tui/tui.js");
+      const { startTui } = await import("../tui/tui.js");
       await startTui(config, opts);
       return;
     } catch {

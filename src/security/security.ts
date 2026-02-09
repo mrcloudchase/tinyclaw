@@ -213,7 +213,7 @@ import path from "node:path";
 
 const AUTO_ALLOW_THRESHOLD = 3;
 const allowlistPath = () => {
-  const { resolveConfigDir } = require("./config/paths.js");
+  const { resolveConfigDir } = require("../config/paths.js");
   return path.join(resolveConfigDir(), "exec-allowlist.json");
 };
 

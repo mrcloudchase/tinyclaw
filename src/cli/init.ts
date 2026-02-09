@@ -5,8 +5,8 @@ import { select, input, password, confirm, checkbox } from "@inquirer/prompts";
 import fs from "node:fs";
 import JSON5 from "json5";
 import chalk from "chalk";
-import { resolveConfigDir, resolveConfigFilePath } from "./config/paths.js";
-import { ensureDir } from "./config/paths.js";
+import { resolveConfigDir, resolveConfigFilePath } from "../config/paths.js";
+import { ensureDir } from "../config/paths.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──
