@@ -31,7 +31,7 @@ export { dispatch, chunkReply, createDebouncer, clearSession, getActiveSessionKe
 export { createChannelRegistry, getChannelRegistry, initChannels, shutdownChannels, type ChannelAdapter, type ChannelCapabilities, type ChannelInstance, type ChannelRegistry, type InboundMessage } from "./channel/channel.js";
 
 // Gateway
-export { startGateway, stopGateway, type GatewayContext, type PresenceEntry } from "./gateway.js";
+export { startGateway, stopGateway, type GatewayContext, type PresenceEntry } from "./gateway/gateway.js";
 
 // Plugins
 export { TinyClawPluginApi, PluginRegistry, discoverAndLoadPlugins, type PluginMeta, type PluginInitFn, type PluginRegistration } from "./plugin/plugin.js";

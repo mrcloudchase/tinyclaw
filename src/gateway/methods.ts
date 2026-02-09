@@ -1,12 +1,12 @@
 // Gateway RPC Methods — 15 JSON-RPC method handlers
 // All in ONE file
 
-import type { TinyClawConfig } from "./config/schema.js";
+import type { TinyClawConfig } from "../config/schema.js";
 import type { GatewayContext } from "./gateway.js";
-import { dispatch, clearSession, getActiveSessionKeys, getActiveSessionCount } from "./pipeline/pipeline.js";
-import { listPendingApprovals, resolveApproval } from "./security/security.js";
-import { loadConfig, watchConfig } from "./config/loader.js";
-import { log } from "./utils/logger.js";
+import { dispatch, clearSession, getActiveSessionKeys, getActiveSessionCount } from "../pipeline/pipeline.js";
+import { listPendingApprovals, resolveApproval } from "../security/security.js";
+import { loadConfig, watchConfig } from "../config/loader.js";
+import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Method Registry ──
@@ -224,7 +224,7 @@ defineMethod("memory.search", async (params, config) => {
   const query = params.query as string;
   if (!query) throw new Error("Missing 'query' parameter");
   const limit = (params.limit as number) ?? 10;
-  const { createMemoryStore } = await import("./memory/memory.js");
+  const { createMemoryStore } = await import("../memory/memory.js");
   const store = createMemoryStore(config);
   const results = await store.search(query, limit);
   return { results: results.map((r) => ({ id: r.entry.id, content: r.entry.content, score: r.score, matchType: r.matchType })) };
@@ -234,7 +234,7 @@ defineMethod("memory.search", async (params, config) => {
 defineMethod("memory.store", async (params, config) => {
   const content = params.content as string;
   if (!content) throw new Error("Missing 'content' parameter");
-  const { createMemoryStore } = await import("./memory/memory.js");
+  const { createMemoryStore } = await import("../memory/memory.js");
   const store = createMemoryStore(config);
   const id = await store.store(content, (params.metadata as Record<string, unknown>) ?? {}, (params.tags as string[]) ?? []);
   return { id };
@@ -246,14 +246,14 @@ defineMethod("memory.store", async (params, config) => {
 
 // 17. cron.list
 defineMethod("cron.list", async (_params, config) => {
-  const { createCronStore } = await import("./cron/cron.js");
+  const { createCronStore } = await import("../cron/cron.js");
   const store = createCronStore(config);
   return { jobs: store.list() };
 });
 
 // 18. cron.add
 defineMethod("cron.add", async (params, config) => {
-  const { createCronStore } = await import("./cron/cron.js");
+  const { createCronStore } = await import("../cron/cron.js");
   const store = createCronStore(config);
   const job = {
     id: params.id as string ?? `job_${Date.now()}`,
@@ -274,7 +274,7 @@ defineMethod("cron.add", async (params, config) => {
 defineMethod("cron.remove", async (params, config) => {
   const id = params.id as string;
   if (!id) throw new Error("Missing 'id' parameter");
-  const { createCronStore } = await import("./cron/cron.js");
+  const { createCronStore } = await import("../cron/cron.js");
   const store = createCronStore(config);
   return { deleted: store.delete(id) };
 });

@@ -2,9 +2,9 @@
 // All in ONE file
 
 import type http from "node:http";
-import type { TinyClawConfig } from "./config/schema.js";
+import type { TinyClawConfig } from "../config/schema.js";
 import type { GatewayContext } from "./gateway.js";
-import { dispatch } from "./pipeline/pipeline.js";
+import { dispatch } from "../pipeline/pipeline.js";
 
 // ══════════════════════════════════════════════
 // ── HTTP Request Handler ──

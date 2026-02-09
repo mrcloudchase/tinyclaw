@@ -3,12 +3,12 @@
 
 import http from "node:http";
 import fs from "node:fs";
-import type { TinyClawConfig } from "./config/schema.js";
-import type { PluginRegistry } from "./plugin/plugin.js";
-import { createChannelRegistry, initChannels, shutdownChannels, type ChannelRegistry } from "./channel/channel.js";
-import { dispatch, createDebouncer } from "./pipeline/pipeline.js";
-import { runHooks } from "./hooks/hooks.js";
-import { log } from "./utils/logger.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import type { PluginRegistry } from "../plugin/plugin.js";
+import { createChannelRegistry, initChannels, shutdownChannels, type ChannelRegistry } from "../channel/channel.js";
+import { dispatch, createDebouncer } from "../pipeline/pipeline.js";
+import { runHooks } from "../hooks/hooks.js";
+import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──
@@ -175,7 +175,7 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
     }
 
     // HTTP API endpoints
-    const { handleHttpRequest } = await import("./gateway-http.js");
+    const { handleHttpRequest } = await import("./http.js");
     await handleHttpRequest(req, res, config, ctx);
   });
 
@@ -206,7 +206,7 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
     ws.on("message", async (data: Buffer) => {
       try {
         const rpc: JsonRpcRequest = JSON.parse(data.toString());
-        const { handleRpcMethod } = await import("./gateway-methods.js");
+        const { handleRpcMethod } = await import("./methods.js");
         const result = await handleRpcMethod(rpc.method, rpc.params ?? {}, config, ctx);
         const response: JsonRpcResponse = { jsonrpc: "2.0", id: rpc.id, result };
         ws.send(JSON.stringify(response));
@@ -253,13 +253,13 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
   // Start config watcher if auto-reload is enabled
   if (config.gateway?.reload?.mode !== "manual") {
     try {
-      const { startConfigWatcher, diffConfig, requiresRestart } = await import("./config/watcher.js");
-      const { resolveConfigFilePath } = await import("./config/paths.js");
+      const { startConfigWatcher, diffConfig, requiresRestart } = await import("../config/watcher.js");
+      const { resolveConfigFilePath } = await import("../config/paths.js");
       const configPath = resolveConfigFilePath();
       if (fs.existsSync(configPath)) {
         const watcher = startConfigWatcher(configPath, async () => {
           try {
-            const { loadConfig } = await import("./config/loader.js");
+            const { loadConfig } = await import("../config/loader.js");
             const newConfig = loadConfig();
             const changed = diffConfig(ctx.config as any, newConfig as any);
             if (changed.length === 0) return;
@@ -349,7 +349,7 @@ async function handleWhatsAppWebhook(
 
   // GET = verification
   if (req.method === "GET") {
-    const { verifyWebhook } = await import("./channel/whatsapp.js");
+    const { verifyWebhook } = await import("../channel/whatsapp.js");
     const query = Object.fromEntries(url.searchParams);
     const verifyToken = config.channels?.whatsapp?.accounts
       ? Object.values(config.channels.whatsapp.accounts)[0]?.verifyToken ?? "tinyclaw"
@@ -375,7 +375,7 @@ async function handleWhatsAppWebhook(
     if (appSecret) {
       const sig = req.headers["x-hub-signature-256"] as string;
       if (sig) {
-        const { validateSignature } = await import("./channel/whatsapp.js");
+        const { validateSignature } = await import("../channel/whatsapp.js");
         if (!validateSignature(body, sig, appSecret)) {
           res.writeHead(401);
           res.end("Invalid signature");
@@ -385,7 +385,7 @@ async function handleWhatsAppWebhook(
     }
 
     try {
-      const { parseWebhookPayload } = await import("./channel/whatsapp.js");
+      const { parseWebhookPayload } = await import("../channel/whatsapp.js");
       const messages = parseWebhookPayload(JSON.parse(body));
 
       for (const msg of messages) {

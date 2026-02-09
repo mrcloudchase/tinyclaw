@@ -75,7 +75,7 @@ program
     const port = config.gateway?.port ?? 18789;
 
     try {
-      const { startGateway } = await import("./gateway.js");
+      const { startGateway } = await import("./gateway/gateway.js");
       await startGateway(config);
       log.info(`TinyClaw gateway listening on port ${port}`);
     } catch (err) {
