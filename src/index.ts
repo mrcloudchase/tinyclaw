@@ -45,13 +45,13 @@ export { spawnAgent, sendToAgent, resolveAgentBinding, listAgents } from "./mult
 // Subsystems
 export { createMemoryStore, type MemoryStore } from "./memory.js";
 export { generateEmbeddings, cosineSimilarity } from "./memory/embeddings.js";
-export { launchBrowser, type BrowserInstance } from "./browser.js";
-export { startScheduler, type CronJob } from "./cron.js";
-export { synthesize, shouldAutoTts, type TtsResult, type TtsProvider } from "./tts.js";
-export { describeImage, processImage, saveMediaFile, detectMime } from "./media.js";
+export { launchBrowser, type BrowserInstance } from "./browser/browser.js";
+export { startScheduler, type CronJob } from "./cron/cron.js";
+export { synthesize, shouldAutoTts, type TtsResult, type TtsProvider } from "./tts/tts.js";
+export { describeImage, processImage, saveMediaFile, detectMime } from "./media/media.js";
 
 // Sandbox
-export { ensureSandboxImage, ensureSandboxContainer, execInSandbox, removeSandboxContainer, listSandboxContainers, cleanupAllSandboxes, containerName, resolveSandboxConfig, type SandboxConfig, type SandboxExecResult } from "./sandbox.js";
+export { ensureSandboxImage, ensureSandboxContainer, execInSandbox, removeSandboxContainer, listSandboxContainers, cleanupAllSandboxes, containerName, resolveSandboxConfig, type SandboxConfig, type SandboxExecResult } from "./sandbox/sandbox.js";
 
 // Pairing
 export { PairingStore, getPairingStore, initPairingStore } from "./pairing.js";

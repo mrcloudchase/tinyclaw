@@ -246,14 +246,14 @@ defineMethod("memory.store", async (params, config) => {
 
 // 17. cron.list
 defineMethod("cron.list", async (_params, config) => {
-  const { createCronStore } = await import("./cron.js");
+  const { createCronStore } = await import("./cron/cron.js");
   const store = createCronStore(config);
   return { jobs: store.list() };
 });
 
 // 18. cron.add
 defineMethod("cron.add", async (params, config) => {
-  const { createCronStore } = await import("./cron.js");
+  const { createCronStore } = await import("./cron/cron.js");
   const store = createCronStore(config);
   const job = {
     id: params.id as string ?? `job_${Date.now()}`,
@@ -274,7 +274,7 @@ defineMethod("cron.add", async (params, config) => {
 defineMethod("cron.remove", async (params, config) => {
   const id = params.id as string;
   if (!id) throw new Error("Missing 'id' parameter");
-  const { createCronStore } = await import("./cron.js");
+  const { createCronStore } = await import("./cron/cron.js");
   const store = createCronStore(config);
   return { deleted: store.delete(id) };
 });

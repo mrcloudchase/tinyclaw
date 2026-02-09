@@ -51,7 +51,7 @@ async function executeCommand(
 ): Promise<{ output: string; exitCode: number | null; sessionId?: string }> {
   // Sandbox routing: execute inside Docker container if specified
   if (opts.sandboxContainer) {
-    const { execInSandbox } = await import("../sandbox.js");
+    const { execInSandbox } = await import("../sandbox/sandbox.js");
     const result = await execInSandbox(opts.sandboxContainer, command, {
       timeoutSec: opts.timeoutSec,
       workdir: opts.cwd,

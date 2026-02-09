@@ -4,9 +4,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import JSON5 from "json5";
-import type { TinyClawConfig } from "./config/schema.js";
-import { resolveCronDir, ensureDir } from "./config/paths.js";
-import { log } from "./utils/logger.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import { resolveCronDir, ensureDir } from "../config/paths.js";
+import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──

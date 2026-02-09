@@ -9,7 +9,7 @@ import { runAgent } from "./agent/runner.js";
 import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentForChannel } from "./agent/session.js";
 import { runHooks } from "./hooks.js";
 import { detectInjection, wrapUntrustedContent, sanitizeForLog } from "./security.js";
-import { shouldAutoTts, synthesize, summarizeForTts } from "./tts.js";
+import { shouldAutoTts, synthesize, summarizeForTts } from "./tts/tts.js";
 import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
@@ -363,7 +363,7 @@ async function processCommand(ctx: MsgContext): Promise<string | undefined> {
     }
     default: {
       // Check if it matches a skill name
-      const { executeSkillCommand } = await import("./skills.js");
+      const { executeSkillCommand } = await import("./skills/skills.js");
       const skillResult = executeSkillCommand(name, args);
       if (skillResult.type === "prompt" && skillResult.rewrittenBody) {
         ctx.body = skillResult.rewrittenBody;
@@ -385,7 +385,7 @@ async function orchestrate(ctx: MsgContext, onChunk?: (chunk: string) => void): 
   let sandboxContainer: string | undefined;
   if (ctx.source === "channel" && ctx.config.sandbox?.enabled) {
     try {
-      const { ensureSandboxContainer } = await import("./sandbox.js");
+      const { ensureSandboxContainer } = await import("./sandbox/sandbox.js");
       sandboxContainer = await ensureSandboxContainer(ctx.sessionKey, ctx.config.sandbox) ?? undefined;
     } catch (err) {
       log.warn(`Sandbox setup failed: ${err}`);

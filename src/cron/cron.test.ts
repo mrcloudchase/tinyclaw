@@ -10,17 +10,17 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("./config/paths.js", () => ({
+vi.mock("../config/paths.js", () => ({
   resolveCronDir: () => "/mock/.config/tinyclaw/cron",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("./utils/logger.js", () => ({
+vi.mock("../utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
 import { createCronStore, startScheduler, stopScheduler, catchUpMissedJobs, type CronJob } from "./cron.js";
-import type { TinyClawConfig } from "./config/schema.js";
+import type { TinyClawConfig } from "../config/schema.js";
 
 const baseConfig: TinyClawConfig = {
   agent: { provider: "anthropic", model: "claude-sonnet-4-5-20250929", thinkingLevel: "off" },

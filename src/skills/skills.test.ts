@@ -9,13 +9,13 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("./config/paths.js", () => ({
+vi.mock("../config/paths.js", () => ({
   resolveConfigDir: () => "/mock/.config/tinyclaw",
   resolveSkillsDir: () => "/mock/.config/tinyclaw/skills",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("./utils/logger.js", () => ({
+vi.mock("../utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 

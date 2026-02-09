@@ -3,9 +3,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { resolveSkillsDir, resolveConfigDir, ensureDir } from "./config/paths.js";
-import type { TinyClawConfig } from "./config/schema.js";
-import { log } from "./utils/logger.js";
+import { resolveSkillsDir, resolveConfigDir, ensureDir } from "../config/paths.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import { log } from "../utils/logger.js";
 
 export interface Skill {
   name: string;

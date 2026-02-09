@@ -1,7 +1,7 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { TinyClawConfig } from "../config/schema.js";
-import { synthesize } from "../tts.js";
-import { saveMediaFile } from "../media.js";
+import { synthesize } from "../tts/tts.js";
+import { saveMediaFile } from "../media/media.js";
 import { defineTool } from "./helper.js";
 
 export function createTtsTool(config: TinyClawConfig): AgentTool<any> {

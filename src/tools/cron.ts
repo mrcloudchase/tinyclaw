@@ -1,6 +1,6 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { TinyClawConfig } from "../config/schema.js";
-import { createCronStore, type CronStore, type CronJob } from "../cron.js";
+import { createCronStore, type CronStore, type CronJob } from "../cron/cron.js";
 import { defineTools } from "./helper.js";
 
 let store: CronStore | null = null;

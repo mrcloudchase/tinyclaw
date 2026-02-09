@@ -1,8 +1,8 @@
 // TTS System — Edge + OpenAI + ElevenLabs providers, talk modes, auto-summarize
 // All in ONE file
 
-import type { TinyClawConfig } from "./config/schema.js";
-import { log } from "./utils/logger.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──

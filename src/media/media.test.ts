@@ -7,12 +7,12 @@ vi.mock("node:fs", () => ({
   },
 }));
 
-vi.mock("./config/paths.js", () => ({
+vi.mock("../config/paths.js", () => ({
   resolveMediaDir: () => "/mock/.config/tinyclaw/media",
   ensureDir: vi.fn(),
 }));
 
-vi.mock("./utils/logger.js", () => ({
+vi.mock("../utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 

@@ -1,6 +1,6 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { TinyClawConfig } from "../config/schema.js";
-import { launchBrowser, getBrowserInstance } from "../browser.js";
+import { launchBrowser, getBrowserInstance } from "../browser/browser.js";
 import { defineTools } from "./helper.js";
 
 export function createBrowserTools(config: TinyClawConfig): AgentTool<any>[] {

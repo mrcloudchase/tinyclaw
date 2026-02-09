@@ -245,7 +245,7 @@ cronCmd
   .option("--config <path>", "Config file path override")
   .action(async (opts: any) => {
     const config = loadConfig(opts.config);
-    const { createCronStore } = await import("./cron.js");
+    const { createCronStore } = await import("./cron/cron.js");
     const store = createCronStore(config);
     const jobs = store.list();
     if (jobs.length === 0) { console.log(chalk.dim("No cron jobs.")); return; }
@@ -261,7 +261,7 @@ cronCmd
   .option("--config <path>", "Config file path override")
   .action(async (schedule: string, prompt: string, opts: any) => {
     const config = loadConfig(opts.config);
-    const { createCronStore } = await import("./cron.js");
+    const { createCronStore } = await import("./cron/cron.js");
     const store = createCronStore(config);
     const id = `job_${Date.now()}`;
     store.set({ id, name: opts.name ?? prompt.slice(0, 30), type: "cron", schedule, prompt, enabled: true, createdAt: Date.now() });
@@ -274,7 +274,7 @@ cronCmd
   .option("--config <path>", "Config file path override")
   .action(async (id: string, opts: any) => {
     const config = loadConfig(opts.config);
-    const { createCronStore } = await import("./cron.js");
+    const { createCronStore } = await import("./cron/cron.js");
     const store = createCronStore(config);
     if (store.delete(id)) console.log(chalk.yellow(`Deleted: ${id}`));
     else console.log(chalk.dim("Job not found."));
