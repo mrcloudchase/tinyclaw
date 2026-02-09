@@ -138,6 +138,7 @@ defineMethod("health", async (_params, config, ctx) => {
     sessions: getActiveSessionCount(),
     channels: ctx.channelRegistry.list().map((c) => ({ id: c.id, name: c.name })),
     wsClients: ctx.clients.size,
+    presence: ctx.presence.size,
     model: `${config.agent?.provider}/${config.agent?.model}`,
   };
 });
@@ -295,7 +296,40 @@ defineMethod("sessions.get", async (params) => {
 // ── System Methods ──
 // ══════════════════════════════════════════════
 
-// 21. system.shutdown
+// ══════════════════════════════════════════════
+// ── Presence Methods ──
+// ══════════════════════════════════════════════
+
+// 21. presence.list
+defineMethod("presence.list", async (_params, _config, ctx) => {
+  const entries = [...ctx.presence.values()];
+  return { entries, count: entries.length };
+});
+
+// 22. presence.upsert
+defineMethod("presence.upsert", async (params, _config, ctx) => {
+  const id = params.id as string;
+  if (!id) throw new Error("Missing 'id' parameter");
+  const existing = ctx.presence.get(id);
+  if (existing) {
+    existing.lastSeen = Date.now();
+    if (params.role) existing.role = params.role as any;
+  } else {
+    ctx.presence.set(id, {
+      id,
+      role: (params.role as any) ?? "ui",
+      connectedAt: Date.now(),
+      lastSeen: Date.now(),
+    });
+  }
+  return { id, upserted: true };
+});
+
+// ══════════════════════════════════════════════
+// ── System Methods ──
+// ══════════════════════════════════════════════
+
+// 23. system.shutdown
 defineMethod("system.shutdown", async (_params, _config, ctx) => {
   const { stopGateway, broadcast } = await import("./gateway.js");
   broadcast(ctx, "system.shutdown", { reason: "RPC shutdown request" });

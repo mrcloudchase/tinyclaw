@@ -28,6 +28,13 @@ export function assembleTinyClawTools(
   if (bashIdx >= 0) builtinTools[bashIdx] = execTool as unknown as AgentTool<any>;
   else builtinTools.push(execTool as unknown as AgentTool<any>);
 
+  // Add web tools (web_search + web_fetch)
+  try {
+    const { createWebSearchTool, createWebFetchTool } = require("../tools/web.js");
+    builtinTools.push(createWebSearchTool() as AgentTool<any>);
+    builtinTools.push(createWebFetchTool() as AgentTool<any>);
+  } catch { /* web tools not available */ }
+
   return { builtinTools, customTools: [] };
 }
 

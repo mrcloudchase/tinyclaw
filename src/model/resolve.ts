@@ -75,6 +75,28 @@ export function resolveModel(
     log.warn(`No API key found for provider "${provider}". Set ${provider.toUpperCase()}_API_KEY or add it to your config.`);
   }
 
+  // Auto-detect well-known local providers
+  const LOCAL_PROVIDERS: Record<string, { baseUrl: string; api: string }> = {
+    ollama:   { baseUrl: "http://127.0.0.1:11434/v1", api: "openai-completions" },
+    lmstudio: { baseUrl: "http://127.0.0.1:1234/v1",  api: "openai-completions" },
+    vllm:     { baseUrl: "http://127.0.0.1:8000/v1",  api: "openai-completions" },
+    litellm:  { baseUrl: "http://127.0.0.1:4000/v1",  api: "openai-completions" },
+  };
+  const localProvider = LOCAL_PROVIDERS[provider];
+  if (localProvider && !config.models?.providers?.[provider]) {
+    const model: Model<any> = {
+      id: modelId, name: modelId, provider,
+      api: localProvider.api as any,
+      baseUrl: localProvider.baseUrl,
+      reasoning: false, input: ["text"],
+      contextWindow: config.agent?.contextWindow ?? 128_000,
+      maxTokens: config.agent?.maxTokens ?? 8192,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    };
+    log.debug(`Resolved local provider: ${provider}/${modelId} → ${localProvider.baseUrl}`);
+    return { model, authStorage, modelRegistry, provider, modelId };
+  }
+
   // Check custom providers in config
   const customProvider = config.models?.providers?.[provider];
   if (customProvider) {

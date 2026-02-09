@@ -82,6 +82,51 @@ export interface PipelineResult {
 
 const activeSessions = new Map<string, TinyClawSession>();
 
+// ── Message Deduplication ──
+const recentMessages = new Map<string, number>();
+const DEDUP_TTL_MS = 60_000;
+
+function isDuplicate(channelId: string | undefined, messageId: string | undefined): boolean {
+  if (!channelId || !messageId) return false;
+  const key = `${channelId}:${messageId}`;
+  const now = Date.now();
+  // Sweep expired entries (every check, cheap since Map is small)
+  for (const [k, ts] of recentMessages) {
+    if (now - ts > DEDUP_TTL_MS) recentMessages.delete(k);
+  }
+  if (recentMessages.has(key)) {
+    log.debug(`Dedup: skipping duplicate message ${key}`);
+    return true;
+  }
+  recentMessages.set(key, now);
+  return false;
+}
+
+// ── Collect Buffer (batch rapid messages) ──
+const collectBuffers = new Map<string, { parts: string[]; timer: ReturnType<typeof setTimeout>; callback: (combined: string) => void }>();
+
+function collectBuffer(key: string, body: string, windowMs: number, callback: (combined: string) => void): void {
+  const existing = collectBuffers.get(key);
+  if (existing) {
+    clearTimeout(existing.timer);
+    existing.parts.push(body);
+    existing.timer = setTimeout(() => {
+      collectBuffers.delete(key);
+      existing.callback(existing.parts.join("\n"));
+    }, windowMs);
+  } else {
+    const entry = {
+      parts: [body],
+      callback,
+      timer: setTimeout(() => {
+        collectBuffers.delete(key);
+        callback(entry.parts.join("\n"));
+      }, windowMs),
+    };
+    collectBuffers.set(key, entry);
+  }
+}
+
 export async function dispatch(params: {
   source: MsgContext["source"];
   body: string;
@@ -98,6 +143,23 @@ export async function dispatch(params: {
   onChunk?: (chunk: string) => void;
   onTts?: (audio: Buffer) => void;
 }): Promise<PipelineResult> {
+  // Dedup check — skip duplicate channel messages
+  if (isDuplicate(params.channelId, params.messageId)) {
+    return { sessionKey: "", reply: undefined };
+  }
+
+  // Collect mode — batch rapid messages from same peer before dispatching
+  if (params.source === "channel" && params.config.pipeline?.collectMode === "collect" && !(params as any)._collected) {
+    const peerId = params.peerId ?? "unknown";
+    const collectKey = `${params.channelId ?? ""}:${peerId}`;
+    return new Promise<PipelineResult>((resolve) => {
+      collectBuffer(collectKey, params.body, params.config.pipeline?.collectWindowMs ?? 3000, async (combined) => {
+        const result = await dispatch({ ...params, body: combined, _collected: true } as any);
+        resolve(result);
+      });
+    });
+  }
+
   const ac = new AbortController();
 
   // Build initial context

@@ -14,6 +14,13 @@ import { log } from "./util/logger.js";
 // ── Types ──
 // ══════════════════════════════════════════════
 
+export interface PresenceEntry {
+  id: string;
+  role: "ui" | "cli" | "webchat" | "node" | "backend";
+  connectedAt: number;
+  lastSeen: number;
+}
+
 export interface GatewayContext {
   config: TinyClawConfig;
   server: http.Server;
@@ -22,6 +29,7 @@ export interface GatewayContext {
   pluginRegistry?: PluginRegistry;
   clients: Set<any>;
   debouncer: ReturnType<typeof createDebouncer>;
+  presence: Map<string, PresenceEntry>;
 }
 
 interface JsonRpcRequest {
@@ -148,6 +156,14 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
       return;
     }
 
+    // Generic webhook endpoint
+    const webhookCfg = config.gateway?.webhook;
+    const webhookPath = webhookCfg?.path ?? "/webhook";
+    if (webhookCfg?.enabled && url.pathname === webhookPath && req.method === "POST") {
+      await handleGenericWebhook(req, res, config, ctx);
+      return;
+    }
+
     // Plugin HTTP handlers
     if (pluginRegistry) {
       for (const handler of pluginRegistry.getAllHttpHandlers()) {
@@ -168,7 +184,12 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
   const wss = new WebSocket.WebSocketServer({ server });
 
   const clients = new Set<any>();
-  const ctx: GatewayContext = { config, server, wss, channelRegistry, pluginRegistry, clients, debouncer };
+  const presence = new Map<string, PresenceEntry>();
+
+  // Seed gateway self-presence
+  presence.set("gateway", { id: "gateway", role: "backend", connectedAt: Date.now(), lastSeen: Date.now() });
+
+  const ctx: GatewayContext = { config, server, wss, channelRegistry, pluginRegistry, clients, debouncer, presence };
 
   wss.on("connection", (ws: any, req: http.IncomingMessage) => {
     if (!authenticateRequest(config, req)) {
@@ -177,6 +198,9 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
     }
 
     clients.add(ws);
+    const clientId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    (ws as any).__presenceId = clientId;
+    presence.set(clientId, { id: clientId, role: "ui", connectedAt: Date.now(), lastSeen: Date.now() });
     log.info(`WebSocket client connected (${clients.size} total)`);
 
     ws.on("message", async (data: Buffer) => {
@@ -197,6 +221,7 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
 
     ws.on("close", () => {
       clients.delete(ws);
+      presence.delete((ws as any).__presenceId);
       log.debug(`WebSocket client disconnected (${clients.size} remaining)`);
     });
 
@@ -212,6 +237,18 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
 
   // Fire boot hook
   await runHooks("boot", { config, port, host });
+
+  // Presence sweep + heartbeat (every 60s)
+  const presenceInterval = setInterval(() => {
+    const now = Date.now();
+    const PRESENCE_TTL = 5 * 60_000;
+    for (const [id, entry] of presence) {
+      if (id !== "gateway" && now - entry.lastSeen > PRESENCE_TTL) presence.delete(id);
+    }
+    presence.get("gateway")!.lastSeen = now;
+    broadcast(ctx, "health.heartbeat", { uptime: Math.round(process.uptime()), clients: clients.size, sessions: 0 });
+  }, 60_000);
+  (ctx as any).__presenceInterval = presenceInterval;
 
   // Start config watcher if auto-reload is enabled
   if (config.gateway?.reload?.mode !== "manual") {
@@ -268,8 +305,9 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
 export async function stopGateway(ctx: GatewayContext): Promise<void> {
   log.info("Shutting down gateway...");
 
-  // Stop config watcher
+  // Stop config watcher + presence sweep
   (ctx as any).__configWatcher?.stop();
+  clearInterval((ctx as any).__presenceInterval);
 
   await runHooks("shutdown", {});
   ctx.debouncer.clear();
@@ -439,6 +477,57 @@ async function handleTelegramWebhook(
 
   res.writeHead(200);
   res.end("OK");
+}
+
+// ══════════════════════════════════════════════
+// ── Generic Webhook Handler ──
+// ══════════════════════════════════════════════
+
+async function handleGenericWebhook(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  config: TinyClawConfig,
+  ctx: GatewayContext,
+): Promise<void> {
+  // Authenticate webhook
+  const webhookCfg = config.gateway?.webhook;
+  const expectedToken = webhookCfg?.token
+    ?? (webhookCfg?.tokenEnv ? process.env[webhookCfg.tokenEnv] : undefined)
+    ?? process.env.TINYCLAW_WEBHOOK_TOKEN;
+  if (expectedToken) {
+    const authHeader = req.headers.authorization ?? "";
+    if (authHeader !== `Bearer ${expectedToken}`) {
+      res.writeHead(401);
+      res.end("Unauthorized");
+      return;
+    }
+  }
+
+  try {
+    const raw = await readBody(req);
+    const payload = JSON.parse(raw);
+    const mode = payload.mode ?? "wake"; // "wake" or "agent"
+    const body = payload.message ?? payload.body ?? payload.text ?? raw;
+    const sessionKey = payload.sessionKey ?? "webhook";
+
+    if (mode === "agent") {
+      // Full agent turn
+      const result = await dispatch({ source: "gateway", body, config, peerId: sessionKey });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ reply: result.reply, sessionKey: result.sessionKey }));
+    } else {
+      // Wake: inject into session and broadcast
+      broadcast(ctx, "channel.message", { source: "webhook", body, sessionKey });
+      const result = await dispatch({ source: "gateway", body, config, peerId: sessionKey });
+      if (result.reply) broadcast(ctx, "chat.message", { sessionKey, text: result.reply });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, sessionKey: result.sessionKey }));
+    }
+  } catch (err) {
+    log.error(`Webhook error: ${err}`);
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+  }
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {

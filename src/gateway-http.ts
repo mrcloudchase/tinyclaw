@@ -19,6 +19,17 @@ export async function handleHttpRequest(
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   const method = req.method?.toUpperCase();
 
+  // WebChat UI
+  if ((url.pathname === "/" || url.pathname === "/chat") && method === "GET") {
+    const { getWebChatHtml } = await import("./webchat.js");
+    const host = req.headers.host ?? "127.0.0.1:18789";
+    const protocol = config.gateway?.tls?.enabled ? "wss" : "ws";
+    const html = getWebChatHtml(`${protocol}://${host}`);
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(html);
+    return;
+  }
+
   // Health check
   if (url.pathname === "/health" && method === "GET") {
     json(res, 200, { status: "ok", uptime: Math.round(process.uptime()) });

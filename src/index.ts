@@ -31,7 +31,7 @@ export { dispatch, chunkReply, createDebouncer, clearSession, getActiveSessionKe
 export { createChannelRegistry, getChannelRegistry, initChannels, shutdownChannels, type ChannelAdapter, type ChannelCapabilities, type ChannelInstance, type ChannelRegistry, type InboundMessage } from "./channel.js";
 
 // Gateway
-export { startGateway, stopGateway, type GatewayContext } from "./gateway.js";
+export { startGateway, stopGateway, type GatewayContext, type PresenceEntry } from "./gateway.js";
 
 // Plugins
 export { TinyClawPluginApi, PluginRegistry, discoverAndLoadPlugins, type PluginMeta, type PluginInitFn, type PluginRegistration } from "./plugin.js";
@@ -55,6 +55,9 @@ export { ensureSandboxImage, ensureSandboxContainer, execInSandbox, removeSandbo
 
 // Pairing
 export { PairingStore, getPairingStore, initPairingStore } from "./pairing.js";
+
+// Web Tools
+export { createWebSearchTool, createWebFetchTool } from "./tools/web.js";
 
 // Util
 export { log, setVerbose, setJsonMode, setLogFile } from "./util/logger.js";

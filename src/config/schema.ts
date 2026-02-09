@@ -71,6 +71,12 @@ const GatewayHttpSchema = z.object({
   responses: z.boolean().default(true),
   models: z.boolean().default(true),
 });
+const WebhookSchema = z.object({
+  enabled: z.boolean().default(false),
+  path: z.string().default("/webhook"),
+  token: z.string().optional(),
+  tokenEnv: z.string().optional(),
+});
 const GatewaySchema = z.object({
   port: z.number().default(18789),
   mode: z.enum(["local", "remote"]).default("local"),
@@ -78,6 +84,7 @@ const GatewaySchema = z.object({
   customBindHost: z.string().optional(),
   auth: GatewayAuthSchema.optional(),
   http: GatewayHttpSchema.optional(),
+  webhook: WebhookSchema.optional(),
   tls: z.object({
     enabled: z.boolean().default(false),
     certPath: z.string().optional(),
@@ -295,6 +302,8 @@ const SessionSchema = z.object({
 // ── Pipeline ──
 const PipelineSchema = z.object({
   inboundDebounceMs: z.number().default(1500),
+  collectMode: z.enum(["off", "collect"]).default("off"),
+  collectWindowMs: z.number().default(3000),
   maxQueueSize: z.number().default(100),
   chunkSize: z.object({
     min: z.number().default(800),

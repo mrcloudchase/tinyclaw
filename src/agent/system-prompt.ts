@@ -149,7 +149,7 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
 }
 
 export function loadBootstrapContent(workspaceDir: string): string | undefined {
-  const candidates = ["SOUL.md", "TINYCLAW.md", "CLAUDE.md", "AGENTS.md", ".tinyclaw", ".claude"];
+  const candidates = ["SOUL.md", "IDENTITY.md", "USER.md", "TOOLS.md", "TINYCLAW.md", "CLAUDE.md", "AGENTS.md", "BOOTSTRAP.md", ".tinyclaw", ".claude"];
   const parts: string[] = [];
   for (const filename of candidates) {
     const filePath = path.join(workspaceDir, filename);
