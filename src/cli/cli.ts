@@ -327,6 +327,153 @@ program
     else console.log(chalk.yellow(`${failed.length} issue(s) found.`));
   });
 
+// ── Plugins subcommand ──
+const pluginsCmd = program
+  .command("plugins")
+  .description("Manage plugins");
+
+pluginsCmd
+  .command("list")
+  .description("List all discovered plugins")
+  .option("--config <path>", "Config file path override")
+  .action(async (opts: any) => {
+    const config = loadConfig(opts.config);
+    const { discoverAndLoadPlugins } = await import("../plugin/plugin.js");
+    const registry = await discoverAndLoadPlugins(config);
+    const plugins = registry.getAll();
+    if (plugins.length === 0) { console.log(chalk.dim("No plugins found.")); return; }
+    for (const p of plugins) {
+      const tools = p.registration.tools?.length ?? 0;
+      const hooks = p.registration.hooks?.length ?? 0;
+      console.log(`  ${chalk.cyan(p.meta.id)} (${p.origin})${p.meta.version ? ` v${p.meta.version}` : ""}  ${chalk.dim(`tools:${tools} hooks:${hooks}`)}`);
+    }
+  });
+
+pluginsCmd
+  .command("install <source>")
+  .description("Install a plugin (path, archive, or npm spec)")
+  .option("--dry-run", "Show what would be installed without installing")
+  .action(async (source: string, opts: any) => {
+    const { installPluginFromPath, installPluginFromNpmSpec } = await import("../plugin/install.js");
+    const { recordPluginInstall } = await import("../plugin/installs.js");
+    const { resolveConfigFilePath } = await import("../config/paths.js");
+    const fs = await import("node:fs");
+    const JSON5 = (await import("json5")).default;
+    const path = await import("node:path");
+
+    const resolved = source.startsWith("~") ? path.join(require("node:os").homedir(), source.slice(1)) : path.resolve(source);
+    const isLocalPath = fs.existsSync(resolved) || source.startsWith(".") || source.startsWith("/") || source.startsWith("~") ||
+      source.endsWith(".ts") || source.endsWith(".js") || source.endsWith(".mjs") || source.endsWith(".tgz") || source.endsWith(".tar.gz") || source.endsWith(".zip");
+
+    const logger = { info: (msg: string) => console.log(msg), warn: (msg: string) => console.log(chalk.yellow(msg)) };
+    const result = isLocalPath
+      ? await installPluginFromPath({ path: source, logger, dryRun: opts.dryRun })
+      : await installPluginFromNpmSpec({ spec: source, logger, dryRun: opts.dryRun });
+
+    if (!result.ok) { console.log(chalk.red(result.error)); process.exit(1); }
+    if (opts.dryRun) { console.log(chalk.dim(`Would install: ${result.pluginId} → ${result.targetDir}`)); return; }
+
+    // Record in config
+    const configPath = resolveConfigFilePath();
+    let raw: any = {};
+    try { raw = JSON5.parse(fs.readFileSync(configPath, "utf-8")); } catch {}
+    const cfg = loadConfig();
+    const updated = recordPluginInstall(cfg, {
+      pluginId: result.pluginId,
+      source: isLocalPath ? "path" : "npm",
+      sourcePath: isLocalPath ? resolved : undefined,
+      spec: isLocalPath ? undefined : source,
+      installPath: result.targetDir,
+      version: result.version,
+    });
+    raw.plugins = { ...raw.plugins, installs: updated.plugins?.installs, entries: { ...raw.plugins?.entries, [result.pluginId]: { enabled: true } } };
+    fs.writeFileSync(configPath, JSON5.stringify(raw, null, 2));
+    console.log(chalk.green(`Installed plugin: ${result.pluginId}`));
+    console.log(chalk.dim("Restart the gateway to load plugins."));
+  });
+
+pluginsCmd
+  .command("info <id>")
+  .description("Show plugin details")
+  .option("--config <path>", "Config file path override")
+  .action(async (id: string, opts: any) => {
+    const config = loadConfig(opts.config);
+    const { discoverAndLoadPlugins } = await import("../plugin/plugin.js");
+    const registry = await discoverAndLoadPlugins(config);
+    const plugin = registry.get(id);
+    if (!plugin) { console.log(chalk.red(`Plugin not found: ${id}`)); return; }
+    console.log(chalk.cyan(plugin.meta.name || plugin.meta.id));
+    if (plugin.meta.version) console.log(`  Version: ${plugin.meta.version}`);
+    if (plugin.meta.description) console.log(`  ${plugin.meta.description}`);
+    console.log(`  Origin: ${plugin.origin}`);
+    const tools = plugin.registration.tools ?? [];
+    if (tools.length > 0) console.log(`  Tools: ${tools.map((t) => t.name).join(", ")}`);
+    const hooks = plugin.registration.hooks ?? [];
+    if (hooks.length > 0) console.log(`  Hooks: ${hooks.map((h) => h.event).join(", ")}`);
+  });
+
+pluginsCmd
+  .command("enable <id>")
+  .description("Enable a plugin in config")
+  .option("--config <path>", "Config file path override")
+  .action(async (id: string, opts: any) => {
+    const { resolveConfigFilePath } = await import("../config/paths.js");
+    const fs = await import("node:fs");
+    const JSON5 = (await import("json5")).default;
+    const configPath = opts.config || resolveConfigFilePath();
+    let raw: any = {};
+    try { raw = JSON5.parse(fs.readFileSync(configPath, "utf-8")); } catch {}
+    if (!raw.plugins) raw.plugins = {};
+    if (!raw.plugins.entries) raw.plugins.entries = {};
+    raw.plugins.entries[id] = { ...raw.plugins.entries[id], enabled: true };
+    fs.writeFileSync(configPath, JSON5.stringify(raw, null, 2));
+    console.log(chalk.green(`Enabled plugin "${id}". Restart the gateway to apply.`));
+  });
+
+pluginsCmd
+  .command("disable <id>")
+  .description("Disable a plugin in config")
+  .option("--config <path>", "Config file path override")
+  .action(async (id: string, opts: any) => {
+    const { resolveConfigFilePath } = await import("../config/paths.js");
+    const fs = await import("node:fs");
+    const JSON5 = (await import("json5")).default;
+    const configPath = opts.config || resolveConfigFilePath();
+    let raw: any = {};
+    try { raw = JSON5.parse(fs.readFileSync(configPath, "utf-8")); } catch {}
+    if (!raw.plugins) raw.plugins = {};
+    if (!raw.plugins.entries) raw.plugins.entries = {};
+    raw.plugins.entries[id] = { ...raw.plugins.entries[id], enabled: false };
+    fs.writeFileSync(configPath, JSON5.stringify(raw, null, 2));
+    console.log(chalk.yellow(`Disabled plugin "${id}". Restart the gateway to apply.`));
+  });
+
+pluginsCmd
+  .command("uninstall <id>")
+  .description("Remove an installed plugin")
+  .option("--config <path>", "Config file path override")
+  .action(async (id: string, opts: any) => {
+    const { resolveConfigFilePath } = await import("../config/paths.js");
+    const fs = await import("node:fs");
+    const JSON5 = (await import("json5")).default;
+    const configPath = opts.config || resolveConfigFilePath();
+    let raw: any = {};
+    try { raw = JSON5.parse(fs.readFileSync(configPath, "utf-8")); } catch {}
+    const installRecord = raw.plugins?.installs?.[id];
+    if (!installRecord) { console.log(chalk.red(`No install record for plugin "${id}".`)); return; }
+    // Remove files
+    if (installRecord.installPath && fs.existsSync(installRecord.installPath)) {
+      const fsp = await import("node:fs/promises");
+      await fsp.rm(installRecord.installPath, { recursive: true, force: true });
+      console.log(chalk.dim(`Removed: ${installRecord.installPath}`));
+    }
+    // Remove from config
+    delete raw.plugins.installs[id];
+    if (raw.plugins.entries?.[id]) delete raw.plugins.entries[id];
+    fs.writeFileSync(configPath, JSON5.stringify(raw, null, 2));
+    console.log(chalk.yellow(`Uninstalled plugin "${id}".`));
+  });
+
 // ── Status subcommand ──
 program
   .command("status")

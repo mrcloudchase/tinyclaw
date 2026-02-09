@@ -228,6 +228,19 @@ export async function initChannels(config: TinyClawConfig, registry: ChannelRegi
     }
   }
 
+  // Signal
+  if (config.channels?.signal?.enabled) {
+    try {
+      const { createSignalChannel } = await import("./signal.js");
+      const signalConfig = config.channels.signal;
+      const ch = createSignalChannel(signalConfig, config);
+      registry.register(ch);
+      if (ch.adapter.connect) await ch.adapter.connect();
+    } catch (err) {
+      log.warn(`Failed to init Signal: ${err}`);
+    }
+  }
+
   // Other channels can be initialized similarly via plugins
   log.info(`Initialized ${registry.list().length} channels`);
 }

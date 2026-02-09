@@ -206,6 +206,18 @@ export async function discoverAndLoadPlugins(config: TinyClawConfig): Promise<Pl
     }
   }
 
+  // Origin 5: Installed plugins (from config.plugins.installs)
+  const installs = pluginConfig?.installs;
+  if (installs) {
+    for (const [pluginId, record] of Object.entries(installs)) {
+      if (!shouldLoad(pluginId)) continue;
+      const installPath = record.installPath;
+      if (installPath && fs.existsSync(installPath)) {
+        await loadPluginFromPath(installPath, config, registry, "install", shouldLoad);
+      }
+    }
+  }
+
   log.info(`Loaded ${registry.getAll().length} plugins`);
   return registry;
 }

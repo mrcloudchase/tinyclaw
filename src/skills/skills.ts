@@ -59,8 +59,13 @@ export function loadSkillsFromDir(dir: string): Skill[] {
 export function discoverSkills(config: TinyClawConfig): Skill[] {
   const skills: Skill[] = [];
 
-  // 1. Bundled skills
-  const bundledDir = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "skills", "bundled");
+  // 1. Bundled skills (check both source and dist paths)
+  let bundledDir = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "skills", "bundled");
+  if (!fs.existsSync(bundledDir)) {
+    // Fallback: when running from dist/, skills may be at project root
+    const cwdBundled = path.join(process.cwd(), "skills", "bundled");
+    if (fs.existsSync(cwdBundled)) bundledDir = cwdBundled;
+  }
   if (fs.existsSync(bundledDir)) {
     const bundled = loadSkillsFromDir(bundledDir);
     const allowed = config.skills?.allowBundled;

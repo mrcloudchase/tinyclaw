@@ -143,9 +143,24 @@ const ChannelsSchema = z.object({
     mentionOnly: z.boolean().default(true),
     threadReplies: z.boolean().default(true),
   }).optional(),
+  signal: z.object({
+    enabled: z.boolean().default(false),
+    baseUrl: z.string().optional(),
+    account: z.string().optional(),
+    autoStart: z.boolean().default(true),
+    mediaMaxMb: z.number().default(8),
+  }).optional(),
 });
 
 // ── Plugins ──
+const PluginInstallRecordSchema = z.object({
+  source: z.enum(["npm", "archive", "path"]),
+  spec: z.string().optional(),
+  sourcePath: z.string().optional(),
+  installPath: z.string().optional(),
+  version: z.string().optional(),
+  installedAt: z.string().optional(),
+});
 const PluginsSchema = z.object({
   enabled: z.boolean().default(true),
   allow: z.array(z.string()).optional(),
@@ -156,6 +171,7 @@ const PluginsSchema = z.object({
     enabled: z.boolean().optional(),
     config: z.record(z.string(), z.unknown()).optional(),
   })).optional(),
+  installs: z.record(z.string(), PluginInstallRecordSchema).optional(),
 });
 
 // ── Hooks ──
@@ -250,10 +266,18 @@ const MediaUnderstandingSchema = z.object({
   maxBytes: z.number().optional(),
   models: z.array(z.string()).optional(),
 });
+const AudioTranscriptionSchema = z.object({
+  enabled: z.boolean().default(false),
+  provider: z.enum(["openai", "groq"]).default("openai"),
+  model: z.string().default("whisper-1"),
+  language: z.string().optional(),
+});
 const MediaSchema = z.object({
   concurrency: z.number().default(2),
   image: MediaUnderstandingSchema.optional(),
-  audio: MediaUnderstandingSchema.optional(),
+  audio: MediaUnderstandingSchema.extend({
+    transcription: AudioTranscriptionSchema.optional(),
+  }).optional(),
   video: MediaUnderstandingSchema.optional(),
 });
 

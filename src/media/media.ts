@@ -160,6 +160,101 @@ async function describeWithOpenAI(image: Buffer, model: string, prompt: string):
 }
 
 // ══════════════════════════════════════════════
+// ── Audio Transcription (Whisper API) ──
+// ══════════════════════════════════════════════
+
+export interface TranscriptionResult {
+  text: string;
+  language?: string;
+  duration?: number;
+}
+
+export async function transcribeAudio(
+  buffer: Buffer,
+  config: TinyClawConfig,
+): Promise<TranscriptionResult> {
+  const transcriptionConfig = config.media?.audio?.transcription;
+  if (!transcriptionConfig?.enabled) {
+    throw new Error("Audio transcription is not enabled in config");
+  }
+
+  const provider = transcriptionConfig.provider ?? "openai";
+  const model = transcriptionConfig.model ?? "whisper-1";
+  const language = transcriptionConfig.language;
+
+  // Determine API endpoint and key based on provider
+  let apiUrl: string;
+  let apiKey: string | undefined;
+
+  if (provider === "groq") {
+    apiUrl = "https://api.groq.com/openai/v1/audio/transcriptions";
+    apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new Error("No GROQ_API_KEY set for audio transcription");
+  } else {
+    apiUrl = "https://api.openai.com/v1/audio/transcriptions";
+    apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("No OPENAI_API_KEY set for audio transcription");
+  }
+
+  // Detect audio format for the file extension
+  const format = detectAudioFormat(buffer) ?? "mp3";
+
+  // Build multipart form data
+  const formData = new FormData();
+  const blob = new Blob([buffer], { type: `audio/${format}` });
+  formData.append("file", blob, `audio.${format}`);
+  formData.append("model", model);
+  formData.append("response_format", "verbose_json");
+  if (language) formData.append("language", language);
+
+  const res = await fetch(apiUrl, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Transcription API ${res.status}: ${errBody}`);
+  }
+
+  const data = await res.json() as any;
+  return {
+    text: data.text ?? "",
+    language: data.language,
+    duration: data.duration,
+  };
+}
+
+export async function processAudioMessage(
+  buffer: Buffer,
+  config: TinyClawConfig,
+): Promise<string> {
+  // Check if transcription is enabled
+  if (!config.media?.audio?.transcription?.enabled) {
+    return "[Audio received — transcription not enabled]";
+  }
+
+  // Check file size against max bytes
+  const maxBytes = config.media?.audio?.maxBytes;
+  if (maxBytes && buffer.length > maxBytes) {
+    return `[Audio too large: ${(buffer.length / 1024 / 1024).toFixed(1)} MB exceeds limit]`;
+  }
+
+  try {
+    const result = await transcribeAudio(buffer, config);
+    if (!result.text.trim()) {
+      return "[Audio transcript: (empty — no speech detected)]";
+    }
+    const durationStr = result.duration ? ` (${Math.round(result.duration)}s)` : "";
+    return `[Audio transcript${durationStr}: ${result.text}]`;
+  } catch (err) {
+    log.warn(`Audio transcription failed: ${err}`);
+    return `[Audio transcription failed: ${err instanceof Error ? err.message : String(err)}]`;
+  }
+}
+
+// ══════════════════════════════════════════════
 // ── Media Storage ──
 // ══════════════════════════════════════════════
 

@@ -26,6 +26,9 @@ export default defineConfig({
         "src/skills/skills.ts",
         "src/tools/web.ts",
         "src/media/media.ts",
+        "src/plugin/install.ts",
+        "src/channel/signal.ts",
+        "src/tools/gateway-tool.ts",
         "src/utils/errors.ts",
       ],
       thresholds: {

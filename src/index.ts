@@ -35,6 +35,8 @@ export { startGateway, stopGateway, type GatewayContext, type PresenceEntry } fr
 
 // Plugins
 export { TinyClawPluginApi, PluginRegistry, discoverAndLoadPlugins, type PluginMeta, type PluginInitFn, type PluginRegistration } from "./plugin/plugin.js";
+export { installPluginFromPath, installPluginFromNpmSpec, installPluginFromArchive, installPluginFromDir, installPluginFromFile, type InstallPluginResult, type PluginInstallLogger } from "./plugin/install.js";
+export { recordPluginInstall, type PluginInstallRecord, type PluginInstallUpdate } from "./plugin/installs.js";
 
 // Hooks
 export { registerHook, unregisterHook, runHooks, initHooksFromConfig, type HookEvent, type HookResult } from "./hooks/hooks.js";
@@ -48,7 +50,7 @@ export { generateEmbeddings, cosineSimilarity } from "./memory/embeddings.js";
 export { launchBrowser, type BrowserInstance } from "./browser/browser.js";
 export { startScheduler, type CronJob } from "./cron/cron.js";
 export { synthesize, shouldAutoTts, type TtsResult, type TtsProvider } from "./tts/tts.js";
-export { describeImage, processImage, saveMediaFile, detectMime } from "./media/media.js";
+export { describeImage, processImage, saveMediaFile, detectMime, transcribeAudio, processAudioMessage, type TranscriptionResult } from "./media/media.js";
 
 // Sandbox
 export { ensureSandboxImage, ensureSandboxContainer, execInSandbox, removeSandboxContainer, listSandboxContainers, cleanupAllSandboxes, containerName, resolveSandboxConfig, type SandboxConfig, type SandboxExecResult } from "./sandbox/sandbox.js";

@@ -10,7 +10,7 @@ import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentFo
 import { runHooks } from "../hooks/hooks.js";
 import { detectInjection, wrapUntrustedContent, sanitizeForLog } from "../security/security.js";
 import { shouldAutoTts, synthesize, summarizeForTts } from "../tts/tts.js";
-import { log } from "../utils/logger.js";
+import { log, setVerbose } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── MsgContext ──
@@ -60,6 +60,7 @@ export interface ParsedDirectives {
   thinkOverride?: "off" | "low" | "medium" | "high";
   modelOverride?: string;
   execOverride?: "auto" | "interactive" | "deny";
+  verbose?: "on" | "off";
 }
 
 export interface ParsedCommand {
@@ -293,12 +294,21 @@ async function finalizeInbound(ctx: MsgContext): Promise<void> {
 }
 
 // ══════════════════════════════════════════════
-// ── Process Directives (++think, ++model, ++exec) ──
+// ── Process Directives (++think, /think, ++model, /model, ++exec, /exec, /verbose) ──
 // ══════════════════════════════════════════════
 
-const DIRECTIVE_RE = /^\+\+(\w+)\s+(\S+)/gm;
+const DIRECTIVE_RE = /^(?:\+\+|\/)(\w+)\s+(\S+)/gm;
+
+// Session-level directive persistence: directives stick until changed
+const sessionDirectives = new Map<string, ParsedDirectives>();
 
 function processDirectives(ctx: MsgContext): void {
+  // Load persisted directives for this session
+  const persisted = sessionDirectives.get(ctx.sessionKey);
+  if (persisted) {
+    ctx.directives = { ...persisted };
+  }
+
   const matches = [...ctx.body.matchAll(DIRECTIVE_RE)];
   for (const m of matches) {
     const [, key, value] = m;
@@ -316,8 +326,22 @@ function processDirectives(ctx: MsgContext): void {
           ctx.directives.execOverride = value as ParsedDirectives["execOverride"];
         }
         break;
+      case "verbose":
+        if (["on", "off"].includes(value)) {
+          ctx.directives.verbose = value as ParsedDirectives["verbose"];
+          if (value === "on") {
+            setVerbose(true);
+          }
+        }
+        break;
     }
   }
+
+  // Persist directives for session
+  if (matches.length > 0) {
+    sessionDirectives.set(ctx.sessionKey, { ...ctx.directives });
+  }
+
   // Strip directives from body
   ctx.body = ctx.body.replace(DIRECTIVE_RE, "").trim();
 }
@@ -421,6 +445,23 @@ async function orchestrate(ctx: MsgContext, onChunk?: (chunk: string) => void): 
   if (ctx.mediaUrls?.length) {
     const mediaList = ctx.mediaUrls.map((u) => `[Media: ${u}]`).join("\n");
     prompt = `${mediaList}\n\n${prompt}`;
+  }
+
+  // Audio transcription — if media type is audio and transcription is enabled
+  if (ctx.mediaType?.startsWith("audio/") && ctx.mediaUrls?.length) {
+    try {
+      const { processAudioMessage } = await import("../media/media.js");
+      for (const url of ctx.mediaUrls) {
+        const audioRes = await fetch(url);
+        if (audioRes.ok) {
+          const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+          const transcript = await processAudioMessage(audioBuffer, ctx.config);
+          prompt = `${transcript}\n\n${prompt}`;
+        }
+      }
+    } catch (err) {
+      log.warn(`Audio transcription pipeline error: ${err}`);
+    }
   }
 
   // Envelope context for channel messages
