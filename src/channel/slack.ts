@@ -6,7 +6,7 @@ import { WebClient } from "@slack/web-api";
 import type { TinyClawConfig } from "../config/schema.js";
 import type { ChannelAdapter, ChannelCapabilities, ChannelInstance, InboundMessage } from "../channel.js";
 import { dispatch } from "../pipeline.js";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──

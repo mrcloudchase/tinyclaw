@@ -6,7 +6,7 @@ import { createInterface } from "node:readline/promises";
 import { loadConfig } from "./config/loader.js";
 import { runAgent, type RunResult } from "./agent/runner.js";
 import { compactSession } from "./agent/compact.js";
-import { setVerbose, setJsonMode, log } from "./util/logger.js";
+import { setVerbose, setJsonMode, log } from "./utils/logger.js";
 import type { TinyClawSession } from "./agent/session.js";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 

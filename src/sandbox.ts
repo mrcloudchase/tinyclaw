@@ -2,7 +2,7 @@
 // Uses child_process.spawn("docker", ...) — no new dependencies
 
 import { spawn } from "node:child_process";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──

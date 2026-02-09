@@ -1,6 +1,6 @@
 // Tool Result Truncation — prevents oversized tool results from permanently overflowing context
 
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 const DEFAULT_CONTEXT_WINDOW = 200_000; // chars (conservative)
 const TRUNCATION_THRESHOLD = 0.3; // 30% of context window

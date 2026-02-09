@@ -11,8 +11,8 @@ import {
   isAuthError,
   isRateLimitError,
   describeError,
-} from "../util/errors.js";
-import { log } from "../util/logger.js";
+} from "../utils/errors.js";
+import { log } from "../utils/logger.js";
 
 export interface RunOptions {
   onText?: (text: string) => void;

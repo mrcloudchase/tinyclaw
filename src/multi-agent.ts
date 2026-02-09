@@ -5,7 +5,7 @@ import type { TinyClawConfig } from "./config/schema.js";
 import type { TinyClawSession } from "./agent/session.js";
 import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentForChannel } from "./agent/session.js";
 import { runAgent } from "./agent/runner.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Agent Registry ──

@@ -8,7 +8,7 @@ import type { PluginRegistry } from "./plugin.js";
 import { createChannelRegistry, initChannels, shutdownChannels, type ChannelRegistry } from "./channel.js";
 import { dispatch, createDebouncer } from "./pipeline.js";
 import { runHooks } from "./hooks.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──

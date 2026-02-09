@@ -6,7 +6,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import JSON5 from "json5";
 import { resolveConfigDir, ensureDir } from "./config/paths.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──

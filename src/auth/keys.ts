@@ -2,7 +2,7 @@ import { AuthStorage } from "@mariozechner/pi-coding-agent";
 import type { TinyClawConfig } from "../config/schema.js";
 import { resolveApiKeyFromEnv } from "../config/loader.js";
 import { resolveConfigDir } from "../config/paths.js";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 import fs from "node:fs";
 import path from "node:path";
 

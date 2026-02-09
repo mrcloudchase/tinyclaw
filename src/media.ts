@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { TinyClawConfig } from "./config/schema.js";
 import { resolveMediaDir, ensureDir } from "./config/paths.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── MIME Detection ──

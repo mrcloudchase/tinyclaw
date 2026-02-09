@@ -1,7 +1,7 @@
 // Hook System — Types + runner + 4 bundled hooks
 // All in ONE file
 
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 import type { TinyClawConfig } from "./config/schema.js";
 import type { PluginHookHandler } from "./plugin.js";
 

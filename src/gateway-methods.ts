@@ -6,7 +6,7 @@ import type { GatewayContext } from "./gateway.js";
 import { dispatch, clearSession, getActiveSessionKeys, getActiveSessionCount } from "./pipeline.js";
 import { listPendingApprovals, resolveApproval } from "./security.js";
 import { loadConfig, watchConfig } from "./config/loader.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Method Registry ──

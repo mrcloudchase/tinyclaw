@@ -2,7 +2,7 @@ import { createCodingTools } from "@mariozechner/pi-coding-agent";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { TinyClawConfig } from "../config/schema.js";
 import { createExecTool } from "../exec/exec-tool.js";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 const BUILTIN_TOOL_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
 

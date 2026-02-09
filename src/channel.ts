@@ -2,7 +2,7 @@
 // All in ONE file
 
 import type { TinyClawConfig } from "./config/schema.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 import { runHooks } from "./hooks.js";
 
 // ══════════════════════════════════════════════

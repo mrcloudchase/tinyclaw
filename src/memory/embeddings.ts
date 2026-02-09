@@ -1,7 +1,7 @@
 // Embedding Generation — OpenAI text-embedding-3-small with caching
 
 import { createHash } from "node:crypto";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 const OPENAI_EMBEDDING_URL = "https://api.openai.com/v1/embeddings";
 const DEFAULT_MODEL = "text-embedding-3-small";

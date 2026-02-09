@@ -1,5 +1,5 @@
 import type { AgentSession, CompactionResult } from "@mariozechner/pi-coding-agent";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 /**
  * Triggers context compaction on a session.

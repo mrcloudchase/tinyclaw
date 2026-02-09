@@ -60,5 +60,5 @@ export { PairingStore, getPairingStore, initPairingStore } from "./pairing.js";
 export { createWebSearchTool, createWebFetchTool } from "./tools/web.js";
 
 // Util
-export { log, setVerbose, setJsonMode, setLogFile } from "./util/logger.js";
-export { isContextOverflowError, isAuthError, isRateLimitError, describeError } from "./util/errors.js";
+export { log, setVerbose, setJsonMode, setLogFile } from "./utils/logger.js";
+export { isContextOverflowError, isAuthError, isRateLimitError, describeError } from "./utils/errors.js";

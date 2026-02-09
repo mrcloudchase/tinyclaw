@@ -8,7 +8,7 @@ import type { Component } from "@mariozechner/pi-tui";
 import { runAgent } from "./agent/runner.js";
 import { compactSession } from "./agent/compact.js";
 import type { TinyClawSession } from "./agent/session.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 import chalk from "chalk";
 
 // ══════════════════════════════════════════════

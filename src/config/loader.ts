@@ -3,7 +3,7 @@ import path from "node:path";
 import JSON5 from "json5";
 import { TinyClawConfigSchema, DEFAULT_CONFIG, type TinyClawConfig } from "./schema.js";
 import { resolveConfigDir, resolveConfigFilePath, ensureDir } from "./paths.js";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 const ENV_KEY_MAP: Record<string, string> = {
   anthropic: "ANTHROPIC_API_KEY",

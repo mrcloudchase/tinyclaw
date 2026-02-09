@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import { getShellConfig, killProcessTree } from "./shell.js";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 import type { TinyClawConfig } from "../config/schema.js";
 import type { ApprovalMode } from "../security.js";
 

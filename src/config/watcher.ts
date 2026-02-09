@@ -2,7 +2,7 @@
 // Uses Node.js built-in fs.watch (no chokidar dependency needed)
 
 import fs from "node:fs";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 export type ConfigChangeHandler = (changedPath: string) => void;
 

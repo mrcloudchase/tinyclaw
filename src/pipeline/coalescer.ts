@@ -1,7 +1,7 @@
 // Block Streaming Coalescer — accumulates text chunks into properly-sized messages
 // Respects per-channel text limits and never splits inside fenced code blocks
 
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 export interface CoalescerOptions {
   maxTextLength: number; // per-channel limit (WhatsApp 1600, Telegram 4096, Discord 2000)

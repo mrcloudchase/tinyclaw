@@ -6,7 +6,7 @@ import fs from "node:fs";
 import type { TinyClawConfig } from "./config/schema.js";
 import { resolveMemoryDir, ensureDir } from "./config/paths.js";
 import { generateEmbeddings, cosineSimilarity } from "./memory/embeddings.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── Types ──

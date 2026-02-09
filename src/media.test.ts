@@ -12,7 +12,7 @@ vi.mock("./config/paths.js", () => ({
   ensureDir: vi.fn(),
 }));
 
-vi.mock("./util/logger.js", () => ({
+vi.mock("./utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 

@@ -10,7 +10,7 @@ import { resolveModel, resolveAlias, type ResolvedModel } from "../model/resolve
 import { assembleTinyClawTools } from "./tools.js";
 import { buildSystemPrompt, loadBootstrapContent } from "./system-prompt.js";
 import { resolveSessionFile, resolveSessionsDir, ensureDir } from "../config/paths.js";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 import fs from "node:fs";
 import path from "node:path";
 

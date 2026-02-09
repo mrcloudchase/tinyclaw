@@ -1,7 +1,7 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { TinyClawConfig } from "../config/schema.js";
 import { ssrfCheck } from "../security.js";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 import { defineTool } from "./helper.js";
 
 const fetchCache = new Map<string, { content: string; ts: number }>();

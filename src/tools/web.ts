@@ -2,7 +2,7 @@
 // All in ONE file
 
 import type { AgentTool } from "@mariozechner/pi-agent-core";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── web_search (Brave Search API) ──

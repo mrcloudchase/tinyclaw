@@ -4,7 +4,7 @@ import type { Model } from "@mariozechner/pi-ai";
 import type { TinyClawConfig } from "../config/schema.js";
 import { resolveAgentDir, ensureDir } from "../config/paths.js";
 import { resolveApiKey, setApiKeyOnAuthStorage, loadKeysFromEnv } from "../auth/keys.js";
-import { log } from "../util/logger.js";
+import { log } from "../utils/logger.js";
 
 export interface ResolvedModel {
   model: Model<any>;

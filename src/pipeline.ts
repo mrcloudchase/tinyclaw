@@ -10,7 +10,7 @@ import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentFo
 import { runHooks } from "./hooks.js";
 import { detectInjection, wrapUntrustedContent, sanitizeForLog } from "./security.js";
 import { shouldAutoTts, synthesize, summarizeForTts } from "./tts.js";
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── MsgContext ──

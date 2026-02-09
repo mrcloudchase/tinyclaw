@@ -1,7 +1,7 @@
 // Security Layer — Policy engine, SSRF guard, exec approval, prompt injection detection
 // All in ONE file (~250 lines)
 
-import { log } from "./util/logger.js";
+import { log } from "./utils/logger.js";
 import type { TinyClawConfig } from "./config/schema.js";
 
 // ══════════════════════════════════════════════

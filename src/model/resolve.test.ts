@@ -21,7 +21,7 @@ vi.mock("../auth/keys.js", () => ({
   loadKeysFromEnv: vi.fn(),
 }));
 
-vi.mock("../util/logger.js", () => ({
+vi.mock("../utils/logger.js", () => ({
   log: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 

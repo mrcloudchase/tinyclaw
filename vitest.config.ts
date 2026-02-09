@@ -26,7 +26,7 @@ export default defineConfig({
         "src/multi-agent.ts",
         "src/tools/web.ts",
         "src/media.ts",
-        "src/util/errors.ts",
+        "src/utils/errors.ts",
       ],
       thresholds: {
         lines: 55,
