@@ -1,16 +1,16 @@
 // Message Pipeline — MsgContext + dispatch + inbound + directives + commands + orchestrate + streaming + delivery
 // All in ONE file
 
-import type { TinyClawConfig } from "./config/schema.js";
-import type { ChannelAdapter, ChannelInstance } from "./channel/channel.js";
-import type { TinyClawSession } from "./agent/session.js";
-import type { HookFn } from "./agent/runner.js";
-import { runAgent } from "./agent/runner.js";
-import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentForChannel } from "./agent/session.js";
-import { runHooks } from "./hooks/hooks.js";
-import { detectInjection, wrapUntrustedContent, sanitizeForLog } from "./security/security.js";
-import { shouldAutoTts, synthesize, summarizeForTts } from "./tts/tts.js";
-import { log } from "./utils/logger.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import type { ChannelAdapter, ChannelInstance } from "../channel/channel.js";
+import type { TinyClawSession } from "../agent/session.js";
+import type { HookFn } from "../agent/runner.js";
+import { runAgent } from "../agent/runner.js";
+import { createTinyClawSession, parseSessionKey, buildSessionKey, resolveAgentForChannel } from "../agent/session.js";
+import { runHooks } from "../hooks/hooks.js";
+import { detectInjection, wrapUntrustedContent, sanitizeForLog } from "../security/security.js";
+import { shouldAutoTts, synthesize, summarizeForTts } from "../tts/tts.js";
+import { log } from "../utils/logger.js";
 
 // ══════════════════════════════════════════════
 // ── MsgContext ──
@@ -189,7 +189,7 @@ export async function dispatch(params: {
 
     // Pairing gate — block unknown senders if pairing is required
     if (ctx.source === "channel" && ctx.config.security?.pairingRequired && ctx.channelId) {
-      const { getPairingStore } = await import("./security/pairing.js");
+      const { getPairingStore } = await import("../security/pairing.js");
       const store = getPairingStore();
       if (!store.isAllowed(ctx.channelId, ctx.peerId)) {
         const request = store.createRequest(ctx.channelId, ctx.peerId, ctx.peerName);
@@ -346,7 +346,7 @@ async function processCommand(ctx: MsgContext): Promise<string | undefined> {
     case "compact": {
       const existing = activeSessions.get(ctx.sessionKey);
       if (!existing) return "No active session to compact.";
-      const { compactSession } = await import("./agent/compact.js");
+      const { compactSession } = await import("../agent/compact.js");
       const result = await compactSession(existing.session);
       return `Compacted: ${result.tokensBefore} tokens compacted`;
     }
@@ -363,7 +363,7 @@ async function processCommand(ctx: MsgContext): Promise<string | undefined> {
     }
     default: {
       // Check if it matches a skill name
-      const { executeSkillCommand } = await import("./skills/skills.js");
+      const { executeSkillCommand } = await import("../skills/skills.js");
       const skillResult = executeSkillCommand(name, args);
       if (skillResult.type === "prompt" && skillResult.rewrittenBody) {
         ctx.body = skillResult.rewrittenBody;
@@ -385,7 +385,7 @@ async function orchestrate(ctx: MsgContext, onChunk?: (chunk: string) => void): 
   let sandboxContainer: string | undefined;
   if (ctx.source === "channel" && ctx.config.sandbox?.enabled) {
     try {
-      const { ensureSandboxContainer } = await import("./sandbox/sandbox.js");
+      const { ensureSandboxContainer } = await import("../sandbox/sandbox.js");
       sandboxContainer = await ensureSandboxContainer(ctx.sessionKey, ctx.config.sandbox) ?? undefined;
     } catch (err) {
       log.warn(`Sandbox setup failed: ${err}`);
@@ -405,7 +405,7 @@ async function orchestrate(ctx: MsgContext, onChunk?: (chunk: string) => void): 
   let provider: string | undefined;
   let modelId: string | undefined;
   if (ctx.directives.modelOverride) {
-    const { resolveAlias } = await import("./model/resolve.js");
+    const { resolveAlias } = await import("../model/resolve.js");
     const resolved = resolveAlias(ctx.directives.modelOverride);
     provider = resolved.provider;
     modelId = resolved.modelId;

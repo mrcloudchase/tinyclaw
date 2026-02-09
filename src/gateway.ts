@@ -6,7 +6,7 @@ import fs from "node:fs";
 import type { TinyClawConfig } from "./config/schema.js";
 import type { PluginRegistry } from "./plugin/plugin.js";
 import { createChannelRegistry, initChannels, shutdownChannels, type ChannelRegistry } from "./channel/channel.js";
-import { dispatch, createDebouncer } from "./pipeline.js";
+import { dispatch, createDebouncer } from "./pipeline/pipeline.js";
 import { runHooks } from "./hooks/hooks.js";
 import { log } from "./utils/logger.js";
 

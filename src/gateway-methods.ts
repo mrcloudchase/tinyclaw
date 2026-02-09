@@ -3,7 +3,7 @@
 
 import type { TinyClawConfig } from "./config/schema.js";
 import type { GatewayContext } from "./gateway.js";
-import { dispatch, clearSession, getActiveSessionKeys, getActiveSessionCount } from "./pipeline.js";
+import { dispatch, clearSession, getActiveSessionKeys, getActiveSessionCount } from "./pipeline/pipeline.js";
 import { listPendingApprovals, resolveApproval } from "./security/security.js";
 import { loadConfig, watchConfig } from "./config/loader.js";
 import { log } from "./utils/logger.js";

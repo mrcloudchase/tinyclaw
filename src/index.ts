@@ -25,7 +25,7 @@ export { resolveApiKey, addKeyToPool, markKeyFailed, markKeySuccess, getKeyPoolH
 export { evaluatePolicy, ssrfCheck, detectInjection, wrapUntrustedContent, sanitizePath, isCommandAllowed, trackApproval, type PolicyDecision, type PolicyContext } from "./security/security.js";
 
 // Pipeline
-export { dispatch, chunkReply, createDebouncer, clearSession, getActiveSessionKeys, type MsgContext, type PipelineResult } from "./pipeline.js";
+export { dispatch, chunkReply, createDebouncer, clearSession, getActiveSessionKeys, type MsgContext, type PipelineResult } from "./pipeline/pipeline.js";
 
 // Channels
 export { createChannelRegistry, getChannelRegistry, initChannels, shutdownChannels, type ChannelAdapter, type ChannelCapabilities, type ChannelInstance, type ChannelRegistry, type InboundMessage } from "./channel/channel.js";
