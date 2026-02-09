@@ -204,6 +204,63 @@ export function wrapUntrustedContent(content: string, source: string): string {
 // ── Sanitization ──
 // ══════════════════════════════════════════════
 
+// ══════════════════════════════════════════════
+// ── Exec Allowlist (auto-allow after repeated approvals) ──
+// ══════════════════════════════════════════════
+
+import fs from "node:fs";
+import path from "node:path";
+
+const AUTO_ALLOW_THRESHOLD = 3;
+const allowlistPath = () => {
+  const { resolveConfigDir } = require("./config/paths.js");
+  return path.join(resolveConfigDir(), "exec-allowlist.json");
+};
+
+interface AllowlistEntry { pattern: string; approvalCount: number; autoAllowed: boolean }
+let allowlist: AllowlistEntry[] | null = null;
+
+function loadAllowlist(): AllowlistEntry[] {
+  if (allowlist) return allowlist;
+  try {
+    allowlist = JSON.parse(fs.readFileSync(allowlistPath(), "utf-8"));
+    return allowlist!;
+  } catch { allowlist = []; return allowlist; }
+}
+
+function saveAllowlist(): void {
+  try {
+    fs.mkdirSync(path.dirname(allowlistPath()), { recursive: true });
+    fs.writeFileSync(allowlistPath(), JSON.stringify(loadAllowlist(), null, 2));
+  } catch {}
+}
+
+function commandPrefix(cmd: string): string {
+  return cmd.split(/\s+/).slice(0, 2).join(" ");
+}
+
+export function isCommandAllowed(command: string): boolean {
+  const prefix = commandPrefix(command);
+  return loadAllowlist().some((e) => e.autoAllowed && (e.pattern === command || e.pattern === prefix));
+}
+
+export function trackApproval(command: string): void {
+  const prefix = commandPrefix(command);
+  const list = loadAllowlist();
+  let entry = list.find((e) => e.pattern === prefix);
+  if (!entry) { entry = { pattern: prefix, approvalCount: 0, autoAllowed: false }; list.push(entry); }
+  entry.approvalCount++;
+  if (entry.approvalCount >= AUTO_ALLOW_THRESHOLD) {
+    entry.autoAllowed = true;
+    log.info(`Auto-allowed exec pattern: "${prefix}" (${entry.approvalCount} approvals)`);
+  }
+  saveAllowlist();
+}
+
+// ══════════════════════════════════════════════
+// ── Sanitization ──
+// ══════════════════════════════════════════════
+
 export function sanitizeForLog(text: string, maxLen = 500): string {
   const cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
   return cleaned.length > maxLen ? cleaned.slice(0, maxLen) + "..." : cleaned;

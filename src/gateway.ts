@@ -2,6 +2,7 @@
 // All in ONE file
 
 import http from "node:http";
+import fs from "node:fs";
 import type { TinyClawConfig } from "./config/schema.js";
 import type { PluginRegistry } from "./plugin.js";
 import { createChannelRegistry, initChannels, shutdownChannels, type ChannelRegistry } from "./channel.js";
@@ -212,6 +213,39 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
   // Fire boot hook
   await runHooks("boot", { config, port, host });
 
+  // Start config watcher if auto-reload is enabled
+  if (config.gateway?.reload?.mode !== "manual") {
+    try {
+      const { startConfigWatcher, diffConfig, requiresRestart } = await import("./config/watcher.js");
+      const { resolveConfigFilePath } = await import("./config/paths.js");
+      const configPath = resolveConfigFilePath();
+      if (fs.existsSync(configPath)) {
+        const watcher = startConfigWatcher(configPath, async () => {
+          try {
+            const { loadConfig } = await import("./config/loader.js");
+            const newConfig = loadConfig();
+            const changed = diffConfig(ctx.config as any, newConfig as any);
+            if (changed.length === 0) return;
+            log.info(`Config reloaded (changed: ${changed.join(", ")})`);
+            if (requiresRestart(changed)) {
+              log.warn("Config change requires restart: " + changed.filter((c) => c.startsWith("gateway.") || c.startsWith("plugins.")).join(", "));
+            }
+            ctx.config = newConfig;
+            broadcast(ctx, "config.reload", { changed });
+            await runHooks("config_reload", { config: newConfig, changed });
+          } catch (err) {
+            log.warn(`Config reload failed: ${err}`);
+          }
+        }, config.gateway?.reload?.debounceMs ?? 2000);
+
+        // Store watcher for cleanup
+        (ctx as any).__configWatcher = watcher;
+      }
+    } catch (err) {
+      log.debug(`Config watcher setup failed: ${err}`);
+    }
+  }
+
   // Start plugin services
   if (pluginRegistry) {
     for (const svc of pluginRegistry.getAllServices()) {
@@ -233,6 +267,9 @@ export async function startGateway(config: TinyClawConfig, pluginRegistry?: Plug
 
 export async function stopGateway(ctx: GatewayContext): Promise<void> {
   log.info("Shutting down gateway...");
+
+  // Stop config watcher
+  (ctx as any).__configWatcher?.stop();
 
   await runHooks("shutdown", {});
   ctx.debouncer.clear();

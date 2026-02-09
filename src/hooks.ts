@@ -51,14 +51,31 @@ export function unregisterHook(id: string): void {
 
 const HOOK_TIMEOUT_MS = 5000;
 
-export async function runHooks(event: HookEvent | string, data: Record<string, unknown>): Promise<void> {
+export interface HookResult {
+  abort?: boolean;
+  abortMessage?: string;
+  transform?: Record<string, unknown>;
+}
+
+export async function runHooks(event: HookEvent | string, data: Record<string, unknown>): Promise<HookResult | void> {
   const matching = hooks.filter((h) => h.event === event || h.event === "*");
   for (const hook of matching) {
     try {
-      await Promise.race([
+      const result = await Promise.race([
         hook.handler(event, data),
         new Promise((_, reject) => setTimeout(() => reject(new Error(`Hook ${hook.id} timed out (${HOOK_TIMEOUT_MS}ms)`)), HOOK_TIMEOUT_MS)),
-      ]);
+      ]) as HookResult | void;
+
+      // Handle hook transform/abort returns
+      if (result && typeof result === "object") {
+        if (result.abort) {
+          log.info(`Hook ${hook.id} aborted event ${event}`);
+          return result;
+        }
+        if (result.transform) {
+          Object.assign(data, result.transform);
+        }
+      }
     } catch (err) {
       log.warn(`Hook ${hook.id} failed for event ${event}: ${err instanceof Error ? err.message : err}`);
     }

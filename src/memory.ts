@@ -5,6 +5,7 @@ import path from "node:path";
 import fs from "node:fs";
 import type { TinyClawConfig } from "./config/schema.js";
 import { resolveMemoryDir, ensureDir } from "./config/paths.js";
+import { generateEmbeddings, cosineSimilarity } from "./memory/embeddings.js";
 import { log } from "./util/logger.js";
 
 // ══════════════════════════════════════════════
@@ -103,26 +104,84 @@ function rowToEntry(row: any): MemoryEntry {
 
 export function createMemoryStore(config: TinyClawConfig): MemoryStore {
   const database = getDb(config);
+  const embeddingModel = config.memory?.embeddingModel ?? "text-embedding-3-small";
+  let hasVec = false;
+  try { database.prepare("SELECT * FROM memory_vec LIMIT 0").run(); hasVec = true; } catch {}
 
   return {
     async store(content, metadata = {}, tags = []) {
       const result = database.prepare(
         "INSERT INTO memories (content, metadata, tags, source) VALUES (?, ?, ?, ?)",
       ).run(content, JSON.stringify(metadata), JSON.stringify(tags), metadata.source ?? null);
-      log.debug(`Stored memory #${result.lastInsertRowid}`);
-      return Number(result.lastInsertRowid);
+      const id = Number(result.lastInsertRowid);
+
+      // Generate and store embedding if vector search is available
+      if (hasVec) {
+        try {
+          const [embedding] = await generateEmbeddings([content], { model: embeddingModel });
+          if (embedding?.length) {
+            database.prepare("UPDATE memories SET embedding = ? WHERE id = ?").run(Buffer.from(new Float32Array(embedding).buffer), id);
+            database.prepare("INSERT INTO memory_vec(rowid, embedding) VALUES (?, ?)").run(id, Buffer.from(new Float32Array(embedding).buffer));
+          }
+        } catch (err) { log.debug(`Embedding store failed: ${err}`); }
+      }
+
+      log.debug(`Stored memory #${id}`);
+      return id;
     },
 
     async search(query, limit = 10) {
       // BM25 full-text search
-      const rows = database.prepare(
+      const bm25Rows = database.prepare(
         `SELECT m.*, rank FROM memories_fts f JOIN memories m ON m.id = f.rowid WHERE memories_fts MATCH ? ORDER BY rank LIMIT ?`,
-      ).all(query, limit);
-      return rows.map((r: any) => ({
+      ).all(query, limit * 2);
+      const bm25Results = bm25Rows.map((r: any) => ({
         entry: rowToEntry(r),
         score: -r.rank,
         matchType: "bm25" as const,
       }));
+
+      // If no vector search, return BM25 only
+      if (!hasVec) return bm25Results.slice(0, limit);
+
+      // Hybrid: vector search + BM25
+      try {
+        const [queryEmbedding] = await generateEmbeddings([query], { model: embeddingModel });
+        if (!queryEmbedding?.length) return bm25Results.slice(0, limit);
+
+        const vecRows = database.prepare(
+          "SELECT rowid, distance FROM memory_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
+        ).all(Buffer.from(new Float32Array(queryEmbedding).buffer), limit * 2);
+
+        // Merge: 0.7 * cosine + 0.3 * BM25
+        const scoreMap = new Map<number, { bm25: number; cosine: number }>();
+        const maxBm25 = Math.max(...bm25Results.map((r: { score: number }) => r.score), 1);
+        for (const r of bm25Results) {
+          scoreMap.set(r.entry.id, { bm25: r.score / maxBm25, cosine: 0 });
+        }
+        for (const vr of vecRows as any[]) {
+          const cosScore = 1 - (vr.distance ?? 0); // distance → similarity
+          const existing = scoreMap.get(vr.rowid);
+          if (existing) existing.cosine = cosScore;
+          else scoreMap.set(vr.rowid, { bm25: 0, cosine: cosScore });
+        }
+
+        // Rank by hybrid score
+        const ranked = [...scoreMap.entries()]
+          .map(([id, scores]) => ({ id, score: 0.7 * scores.cosine + 0.3 * scores.bm25 }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, limit);
+
+        const entries = ranked.map((r) => {
+          const row = database.prepare("SELECT * FROM memories WHERE id = ?").get(r.id);
+          return { entry: rowToEntry(row), score: r.score, matchType: "hybrid" as const };
+        }).filter((r) => r.entry);
+
+        return entries;
+      } catch (err) {
+        log.debug(`Vector search failed, falling back to BM25: ${err}`);
+        return bm25Results.slice(0, limit);
+      }
     },
 
     async get(id) {

@@ -55,3 +55,28 @@ export function checkToolLimit(toolCallCount: number, config: TinyClawConfig): b
   const max = config.security?.maxToolCallsPerTurn ?? 50;
   return toolCallCount < max;
 }
+
+// ── Tool Parameter Normalization ──
+// Aliases common parameter names so models that use different names still work
+
+const PARAM_ALIASES: Record<string, Record<string, string>> = {
+  read:  { file_path: "path", filePath: "path" },
+  write: { file_path: "path", filePath: "path" },
+  edit:  { file_path: "path", filePath: "path", old_string: "oldText", new_string: "newText", oldString: "oldText", newString: "newText" },
+  glob:  { file_path: "path", filePath: "path" },
+  grep:  { file_path: "path", filePath: "path" },
+};
+
+export function normalizeToolParams(toolName: string, params: Record<string, unknown>): Record<string, unknown> {
+  const aliases = PARAM_ALIASES[toolName];
+  if (!aliases) return params;
+
+  const normalized = { ...params };
+  for (const [alias, canonical] of Object.entries(aliases)) {
+    if (alias in normalized && !(canonical in normalized)) {
+      normalized[canonical] = normalized[alias];
+      delete normalized[alias];
+    }
+  }
+  return normalized;
+}

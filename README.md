@@ -3,33 +3,40 @@
 </p>
 
 <p align="center">
-  A full-featured AI assistant platform in ~15K lines of TypeScript.
+  A full-featured AI assistant platform in ~10K lines of TypeScript.
 </p>
 
 ---
 
-Includes a CLI coding agent, TUI mode, gateway server with WebSocket + HTTP API, messaging channels (WhatsApp, Telegram, Discord, Slack), plugin system, Docker sandboxing, DM pairing security, memory, browser automation, cron scheduling, TTS, and multi-agent orchestration.
+Includes a CLI coding agent, TUI mode, gateway server with WebSocket + HTTP API, messaging channels (WhatsApp, Telegram, Discord, Slack), plugin system, Docker sandboxing, DM pairing security, session durability with file locking and crash repair, auth resilience with persistent cooldowns, block streaming with per-channel limits, exec approval with auto-allowlist, SOUL.md personality, hybrid vector + BM25 memory search, full cron expressions, config hot-reload, hook transforms, skill commands, and multi-agent orchestration.
 
 ## Features
 
 - **CLI Agent** — Interactive REPL and single-shot mode with streaming output
 - **TUI Mode** — Rich terminal UI via pi-tui with markdown rendering and tool panels
 - **Setup Wizard** — `tinyclaw init` interactive onboarding with provider, channel, and security setup
-- **Gateway Server** — HTTP + WebSocket server with JSON-RPC 2.0 protocol
+- **Gateway Server** — HTTP + WebSocket server with JSON-RPC 2.0 protocol, 21 RPC methods
 - **OpenAI-Compatible API** — `/v1/chat/completions`, `/v1/responses`, `/v1/models`
-- **Message Pipeline** — Inbound debouncing, directives (`++think`, `++model`), slash commands, paragraph-aware chunking, delivery with typing indicators
+- **Message Pipeline** — Inbound debouncing, directives (`++think`, `++model`), slash commands, paragraph-aware chunking, delivery with typing indicators, envelope context
+- **Block Streaming** — Coalescer with per-channel text limits (WhatsApp 1600, Telegram 4096, Discord 2000), code block awareness, dedup
 - **Channels** — WhatsApp, Telegram, Discord, Slack with full adapter support (text, image, audio, video, documents, reactions, threads)
 - **Docker Sandbox** — Isolated code execution in containers with configurable memory/CPU/network limits
 - **DM Pairing** — Unknown sender security with pairing codes and allow-list management
-- **Plugin System** — 10 registration methods, 4-origin discovery (bundled, config, directory, install), 33 bundled plugins
-- **Security** — 10-layer tool policy engine, SSRF guard, prompt injection detection, path traversal prevention, pairing gate
-- **Memory** — SQLite + FTS5 full-text search with optional vector search (sqlite-vec)
+- **Plugin System** — 10 registration methods, 4-origin discovery (bundled, config, directory, workspace), 33 bundled plugins
+- **Security** — 10-layer tool policy engine, SSRF guard, prompt injection detection, path traversal prevention, pairing gate, exec approval with allowlist
+- **Session Durability** — Advisory file locking, crash repair, tool result truncation, token/usage tracking, auto-reset policies (daily/idle/manual)
+- **Auth Resilience** — Multi-key rotation with persistent cooldowns, failure classification (auth/rate_limit/billing/timeout), backoff persistence across restarts
+- **Memory** — SQLite + FTS5 full-text search + vector search (sqlite-vec + OpenAI embeddings), hybrid scoring (0.7 cosine + 0.3 BM25)
+- **Personality** — SOUL.md persona loading, agent identity (name/emoji/prefix), group chat context and style
 - **Browser** — Chrome/CDP automation via playwright-core (navigate, click, type, screenshot, accessibility snapshot)
-- **Cron** — Job scheduler with cron expressions, intervals, one-time jobs, catch-up on missed runs
+- **Cron** — Job scheduler with full 5-field cron expressions, intervals, one-time jobs, catch-up on missed runs
 - **TTS** — Three providers (Edge TTS, OpenAI, ElevenLabs) with auto-summarize
 - **Media** — MIME detection, image processing (sharp), AI vision (Anthropic/OpenAI), audio format detection
 - **Multi-Agent** — Session key routing, agent-channel bindings, subagent spawning, agent-to-agent messaging
 - **Model Flexibility** — Anthropic, OpenAI, Google, custom providers, model aliases, fallback chains, multi-key rotation
+- **Config Hot-Reload** — Automatic config file watching with debounce, selective reload, restart warnings
+- **Hook Transforms** — Hooks can transform data or abort pipeline, sequential execution with priority ordering
+- **Skill Commands** — `/skillname args` dispatches to SKILL.md files with prompt-based or tool-based execution
 
 ## Quick Start
 
@@ -84,6 +91,9 @@ tinyclaw --no-tui
 |---------|-------------|
 | `/new` | Clear session, start fresh |
 | `/compact` | Compact context to free token space |
+| `/status` | Show session info, model, and token usage |
+| `/model [name]` | Show or switch the current model |
+| `/stop` | Stop current generation |
 | `/quit` | Exit REPL |
 
 ### Subcommands
@@ -215,6 +225,78 @@ tinyclaw pair approve ABCD1234  # Approve a code
 tinyclaw pair revoke telegram:default/12345  # Revoke access
 ```
 
+## Session Durability
+
+Sessions are protected against corruption and data loss:
+
+- **File Locking** — Advisory locks via exclusive file creation prevent concurrent writes to JSONL transcripts. Stale lock detection (>30min or dead PID) with exponential backoff retry.
+- **Crash Repair** — On startup, unparseable JSONL lines are dropped and a backup is created. Sessions recover automatically from mid-write crashes.
+- **Tool Result Truncation** — Oversized tool results (>30% of context window) are automatically truncated before causing permanent context overflow.
+- **Token Tracking** — Input/output/cache tokens are tracked per session. View with `/status`.
+- **Auto-Reset** — Sessions can reset automatically based on time policies.
+
+```json
+{
+  "session": {
+    "resetMode": "daily",
+    "resetAtHour": 6
+  }
+}
+```
+
+Reset modes: `"manual"` (default), `"daily"` (resets at configured hour), `"idle"` (resets after N minutes of inactivity).
+
+## Personality
+
+TinyClaw supports persona customization via SOUL.md and config:
+
+**SOUL.md** — Place a `SOUL.md` file in your workspace root to define the agent's personality and tone. It's loaded first and prepended to the system prompt.
+
+**Agent Identity** — Set a custom name, emoji, and response prefix in config:
+
+```json
+{
+  "agent": {
+    "identity": { "name": "Jarvis", "emoji": "🤖" },
+    "responsePrefix": "Sir, "
+  }
+}
+```
+
+**Group Chat** — When responding in group channels, the system prompt adapts with group context, natural writing style, and sender-specific addressing.
+
+## Auth Resilience
+
+Multi-key rotation with persistent cooldowns that survive process restarts:
+
+- **Failure Classification** — Errors are classified as `auth`, `rate_limit`, `billing`, `timeout`, or `format` with per-reason retry behavior
+- **Cooldown Persistence** — State saved to `~/.config/tinyclaw/auth-state.json`. Rate limits: 1min → 5min → 25min → 1hr. Billing: 5hr → 10hr → 20hr → 24hr
+- **Smart Retry** — Rate limits backoff + rotate key. Timeouts retry same key. Auth/billing rotate key. Format errors don't retry
+
+## Exec Approval
+
+Control shell command execution from channel sessions:
+
+```json
+{
+  "security": {
+    "execApproval": "interactive"
+  }
+}
+```
+
+When set to `"interactive"`, bash commands from channel sessions require admin approval via the gateway:
+
+```javascript
+// List pending approvals
+ws.send(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "exec.pending" }));
+
+// Approve
+ws.send(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "exec.approve", params: { id: "approval_..." } }));
+```
+
+After 3 approvals of the same command pattern, it's auto-allowed. The allowlist persists at `~/.config/tinyclaw/exec-allowlist.json`.
+
 ## Gateway Server
 
 ```bash
@@ -250,13 +332,14 @@ ws.send(JSON.stringify({
 }));
 ```
 
-### RPC Methods
+### RPC Methods (21)
 
 | Method | Description |
 |--------|-------------|
 | `chat.send` | Send message, get complete response |
 | `chat.stream` | Send message, stream chunks via events |
 | `sessions.list` | List active sessions |
+| `sessions.get` | Get session details |
 | `sessions.clear` | Clear a specific session |
 | `sessions.clearAll` | Clear all sessions |
 | `config.get` | Get current config (sanitized) |
@@ -265,6 +348,11 @@ ws.send(JSON.stringify({
 | `channels.list` | List connected channels |
 | `channels.send` | Send message via channel |
 | `models.list` | List available models |
+| `memory.search` | Query long-term memory |
+| `memory.store` | Add a memory entry |
+| `cron.list` | List scheduled jobs |
+| `cron.add` | Create a scheduled job |
+| `cron.remove` | Delete a scheduled job |
 | `exec.pending` | List pending exec approvals |
 | `exec.approve` | Approve a pending exec |
 | `exec.deny` | Deny a pending exec |
@@ -302,12 +390,20 @@ Run `tinyclaw init` for an interactive setup wizard, or create the file manually
     "provider": "anthropic",
     "model": "claude-sonnet-4-5-20250929",
     "thinkingLevel": "off",
-    "fallbacks": ["openai/gpt-4o"]
+    "fallbacks": ["openai/gpt-4o"],
+    "identity": { "name": "MyBot", "emoji": "🤖" },
+    "responsePrefix": ""
+  },
+  "session": {
+    "resetMode": "manual",
+    "resetAtHour": 0,
+    "idleMinutes": 120
   },
   "gateway": {
     "port": 18789,
     "bind": "loopback",
-    "auth": { "mode": "token", "token": "my-secret" }
+    "auth": { "mode": "token", "token": "my-secret" },
+    "reload": { "mode": "auto", "debounceMs": 2000 }
   },
   "channels": {
     "defaults": {
@@ -340,7 +436,8 @@ Run `tinyclaw init` for an interactive setup wizard, or create the file manually
   },
   "memory": {
     "backend": "builtin",
-    "embeddingProvider": "openai"
+    "embeddingProvider": "openai",
+    "embeddingModel": "text-embedding-3-small"
   },
   "tts": {
     "enabled": false,
@@ -350,6 +447,7 @@ Run `tinyclaw init` for an interactive setup wizard, or create the file manually
   "pipeline": {
     "inboundDebounceMs": 1500,
     "typingIndicator": true,
+    "envelope": true,
     "chunkSize": { "min": 800, "max": 1200 },
     "deliveryDelayMs": { "min": 800, "max": 2500 }
   },
@@ -384,7 +482,7 @@ Run `tinyclaw init` for an interactive setup wizard, or create the file manually
 
 ## Plugins
 
-Place `.ts` or `.js` files in `~/.config/tinyclaw/plugins/` for auto-discovery.
+Place `.ts` or `.js` files in `~/.config/tinyclaw/plugins/` or `.tinyclaw/plugins/` (workspace-local) for auto-discovery.
 
 ```typescript
 import type { TinyClawPluginApi } from "tinyclaw";
@@ -406,6 +504,54 @@ export default function init(api: TinyClawPluginApi) {
 
 **Non-channel (15):** Memory Core, Memory LanceDB, Copilot Proxy, TTS Manager, Canvas Renderer, Cron Scheduler, Media Processor, Browser Manager, Analytics, Rate Limiter, Audit Logger, Webhook Relay, Vector Search, Notification Hub, Backup Manager
 
+## Skills
+
+Place `.md` files in `~/.config/tinyclaw/skills/` to create custom slash commands. Each file becomes a `/command`:
+
+```markdown
+---
+description: Summarize a pull request
+tags: [git, review]
+---
+
+Review the pull request and provide:
+1. A one-paragraph summary
+2. Key changes
+3. Potential issues
+```
+
+Usage: `/summarize-pr #123` — The skill content is injected as context for the agent.
+
+## Hook Transforms
+
+Hooks can now transform pipeline data or abort message processing:
+
+```typescript
+api.registerHook("message_inbound", async (event, data) => {
+  // Transform: modify data for downstream hooks
+  return { transform: { body: data.body.toUpperCase() } };
+
+  // Or abort: stop pipeline entirely
+  return { abort: true, abortMessage: "Message blocked" };
+});
+```
+
+Hooks execute sequentially by priority. Each hook sees transforms from previous hooks.
+
+## Config Hot-Reload
+
+When the gateway is running, config file changes are detected automatically:
+
+```json
+{
+  "gateway": {
+    "reload": { "mode": "auto", "debounceMs": 2000 }
+  }
+}
+```
+
+Changes to channels, hooks, and cron are applied immediately. Changes to `gateway.*` or `plugins.*` log a restart warning. Connected WebSocket clients receive a `config.reload` event.
+
 ## Architecture
 
 ```
@@ -414,19 +560,23 @@ src/
 ├── index.ts                  Public API exports
 ├── tui.ts                    TUI mode via pi-tui
 ├── init.ts                   Interactive setup wizard
-├── config/                   Zod schemas, loader, paths
-├── agent/                    Session, runner, tools, system prompt, compact
-├── auth/keys.ts              Multi-key rotation with backoff
+├── config/                   Zod schemas, loader, paths, watcher
+├── agent/                    Session (locking, repair), runner, tools, system prompt, compact, pruning
+├── auth/keys.ts              Multi-key rotation with backoff + persistent cooldowns
 ├── model/resolve.ts          Aliases, fallback chains, custom providers
 ├── exec/                     Shell execution (with sandbox routing)
 ├── util/                     Logger, errors
-├── security.ts               10-layer policy, SSRF, injection detection
+├── security.ts               10-layer policy, SSRF, injection detection, exec allowlist
 ├── sandbox.ts                Docker container management
 ├── pairing.ts                DM pairing store and allow-list
 ├── plugin.ts                 Plugin API, registry, 4-origin loader
-├── hooks.ts                  14 event types, hook runner, bundled hooks
-├── skills.ts                 Skill discovery and formatting
-├── pipeline.ts               Message dispatch, directives, commands, chunking, delivery
+├── hooks.ts                  14 event types, hook runner with transform/abort, bundled hooks
+├── skills.ts                 Skill discovery, formatting, and command execution
+├── pipeline.ts               Message dispatch, directives, commands, chunking, delivery, session reset
+├── pipeline/
+│   └── coalescer.ts          Block streaming coalescer with code block awareness
+├── memory/
+│   └── embeddings.ts         OpenAI embedding generation with caching
 ├── channel.ts                Channel adapter interface, registry, lifecycle
 ├── channel/
 │   ├── whatsapp.ts           WhatsApp Cloud API
@@ -434,12 +584,12 @@ src/
 │   ├── discord.ts            Discord via discord.js
 │   └── slack.ts              Slack via @slack/bolt
 ├── gateway.ts                HTTP + WebSocket server
-├── gateway-methods.ts        15 JSON-RPC handlers
+├── gateway-methods.ts        21 JSON-RPC handlers
 ├── gateway-http.ts           OpenAI-compatible HTTP endpoints
 ├── multi-agent.ts            Agent spawn, A2A messaging, bindings
 ├── memory.ts                 SQLite + FTS5 + vector search
 ├── browser.ts                Chrome/CDP automation
-├── cron.ts                   Job scheduler
+├── cron.ts                   Job scheduler with 5-field cron expression parser
 ├── tts.ts                    Edge/OpenAI/ElevenLabs TTS
 ├── media.ts                  Image/audio processing, AI vision
 ├── tools/                    17 agent tool implementations

@@ -123,7 +123,7 @@ export async function dispatch(params: {
 
   try {
     // Pipeline stages
-    finalizeInbound(ctx);
+    await finalizeInbound(ctx);
 
     // Pairing gate — block unknown senders if pairing is required
     if (ctx.source === "channel" && ctx.config.security?.pairingRequired && ctx.channelId) {
@@ -177,7 +177,7 @@ export async function dispatch(params: {
 // ── Finalize Inbound ──
 // ══════════════════════════════════════════════
 
-function finalizeInbound(ctx: MsgContext): void {
+async function finalizeInbound(ctx: MsgContext): Promise<void> {
   // Resolve agent binding
   if (ctx.channelId) {
     ctx.agentId = resolveAgentForChannel(ctx.config, ctx.channelId, ctx.accountId, ctx.peerId);
@@ -215,14 +215,17 @@ function finalizeInbound(ctx: MsgContext): void {
     log.warn(`Injection detected from ${ctx.peerId}: ${injection.patterns.join(", ")}`);
   }
 
-  // Fire inbound hook
-  runHooks("message_inbound", {
+  // Fire inbound hook (check for abort)
+  const hookResult = await runHooks("message_inbound", {
     body: ctx.body,
     peerId: ctx.peerId,
     channelId: ctx.channelId,
     sessionKey: ctx.sessionKey,
     injectionWarning: ctx.injectionWarning,
-  }).catch(() => {});
+  });
+  if (hookResult && typeof hookResult === "object" && hookResult.abort) {
+    throw new Error(hookResult.abortMessage ?? "Message blocked by hook");
+  }
 
   log.debug(`Inbound [${ctx.source}] from ${ctx.peerId}: ${sanitizeForLog(ctx.body, 100)}`);
 }
@@ -292,12 +295,20 @@ async function processCommand(ctx: MsgContext): Promise<string | undefined> {
     }
     case "status": {
       const s = activeSessions.get(ctx.sessionKey);
-      return s
-        ? `Session: ${ctx.sessionKey}\nAgent: ${s.agentId ?? "default"}\nModel: ${s.resolved.provider}/${s.resolved.modelId}`
-        : `No active session for ${ctx.sessionKey}`;
+      if (!s) return `No active session for ${ctx.sessionKey}`;
+      const u = s.usage;
+      return `Session: ${ctx.sessionKey}\nAgent: ${s.agentId ?? "default"}\nModel: ${s.resolved.provider}/${s.resolved.modelId}\nTokens: ${u.totalTokens} (in: ${u.inputTokens}, out: ${u.outputTokens}, cache-r: ${u.cacheRead}, cache-w: ${u.cacheWrite})`;
     }
-    default:
-      return undefined; // Not a recognized command, treat as regular message
+    default: {
+      // Check if it matches a skill name
+      const { executeSkillCommand } = await import("./skills.js");
+      const skillResult = executeSkillCommand(name, args);
+      if (skillResult.type === "prompt" && skillResult.rewrittenBody) {
+        ctx.body = skillResult.rewrittenBody;
+        return undefined; // Continue to orchestrate with rewritten body
+      }
+      return undefined; // Not a recognized command
+    }
   }
 }
 
@@ -319,8 +330,14 @@ async function orchestrate(ctx: MsgContext, onChunk?: (chunk: string) => void): 
     }
   }
 
-  // Get or create session
+  // Get or create session (with freshness check)
   let tinyClawSession = activeSessions.get(ctx.sessionKey);
+  if (tinyClawSession && evaluateSessionFreshness(ctx.sessionKey, ctx.config)) {
+    log.info(`Session ${ctx.sessionKey} is stale, resetting`);
+    tinyClawSession.session.dispose();
+    activeSessions.delete(ctx.sessionKey);
+    tinyClawSession = undefined;
+  }
 
   // Parse model override
   let provider: string | undefined;
@@ -344,25 +361,45 @@ async function orchestrate(ctx: MsgContext, onChunk?: (chunk: string) => void): 
     prompt = `${mediaList}\n\n${prompt}`;
   }
 
-  // Run agent
-  const result = await runAgent({
-    config: ctx.config,
-    prompt,
-    sessionName: ctx.sessionKey,
-    workspaceDir,
-    provider,
-    modelId,
-    thinkingLevel: ctx.directives.thinkOverride as any,
-    options: {
-      onText: onChunk,
-      abortSignal: ctx.abortController.signal,
-    },
-    existingSession: tinyClawSession,
-    hooks: hookFn,
-  });
+  // Envelope context for channel messages
+  if (ctx.source === "channel" && (ctx.config.pipeline?.envelope !== false)) {
+    const elapsed = Math.round((Date.now() - ctx.receivedAt) / 1000);
+    const ts = new Date(ctx.receivedAt).toISOString().slice(11, 19);
+    const sender = ctx.peerName ?? ctx.peerId;
+    prompt = `[${ctx.channelId} from ${sender} +${elapsed}s ${ts}] ${prompt}`;
+  }
 
-  // Cache session for reuse
+  // Start typing indicator for channel messages
+  const typingCtrl = (ctx.channel && ctx.config.pipeline?.typingIndicator !== false)
+    ? createTypingController(ctx.channel.adapter, ctx.peerId)
+    : undefined;
+  typingCtrl?.start();
+
+  // Run agent
+  let result;
+  try {
+    result = await runAgent({
+      config: ctx.config,
+      prompt,
+      sessionName: ctx.sessionKey,
+      workspaceDir,
+      provider,
+      modelId,
+      thinkingLevel: ctx.directives.thinkOverride as any,
+      options: {
+        onText: onChunk,
+        abortSignal: ctx.abortController.signal,
+      },
+      existingSession: tinyClawSession,
+      hooks: hookFn,
+    });
+  } finally {
+    typingCtrl?.seal();
+  }
+
+  // Cache session for reuse + track timestamp
   activeSessions.set(ctx.sessionKey, result.tinyClawSession);
+  sessionTimestamps.set(ctx.sessionKey, Date.now());
 
   // Chunk the reply for channel delivery
   const chunks = ctx.channel ? chunkReply(result.text, ctx.config) : undefined;
@@ -438,6 +475,34 @@ export function chunkReply(text: string, config: TinyClawConfig): string[] {
 }
 
 // ══════════════════════════════════════════════
+// ── Typing Controller (lifecycle-aware) ──
+// ══════════════════════════════════════════════
+
+function createTypingController(adapter: ChannelAdapter, peerId: string) {
+  let interval: ReturnType<typeof setInterval> | null = null;
+  let sealed = false;
+  const TTL = 2 * 60_000; // 2 min max
+  const REFRESH = 6_000;   // 6s refresh
+  let startedAt = 0;
+
+  return {
+    start() {
+      if (sealed || !adapter.sendTyping) return;
+      startedAt = Date.now();
+      adapter.sendTyping(peerId).catch(() => {});
+      interval = setInterval(() => {
+        if (Date.now() - startedAt > TTL) { this.stop(); return; }
+        adapter.sendTyping!(peerId).catch(() => {});
+      }, REFRESH);
+    },
+    stop() {
+      if (interval) { clearInterval(interval); interval = null; }
+    },
+    seal() { sealed = true; this.stop(); },
+  };
+}
+
+// ══════════════════════════════════════════════
 // ── Deliver (send chunks to channel with delays + typing) ──
 // ══════════════════════════════════════════════
 
@@ -447,15 +512,15 @@ async function deliver(ctx: MsgContext, chunks: string[]): Promise<void> {
 
   const minDelay = ctx.config.pipeline?.deliveryDelayMs?.min ?? 800;
   const maxDelay = ctx.config.pipeline?.deliveryDelayMs?.max ?? 2500;
-  const showTyping = ctx.config.pipeline?.typingIndicator !== false;
+
+  // Apply response prefix if configured
+  const prefix = ctx.config.agent?.responsePrefix;
+  if (prefix && chunks.length > 0) {
+    chunks[0] = prefix + chunks[0];
+  }
 
   for (let i = 0; i < chunks.length; i++) {
     if (ctx.abortController.signal.aborted) break;
-
-    // Send typing indicator
-    if (showTyping && adapter.sendTyping) {
-      try { await adapter.sendTyping(ctx.peerId); } catch { /* ignore */ }
-    }
 
     // Delay between chunks (not before first)
     if (i > 0) {
@@ -521,6 +586,36 @@ export function createDebouncer(config: TinyClawConfig, onFlush: (sessionKey: st
 
     get size() { return buffers.size; },
   };
+}
+
+// ══════════════════════════════════════════════
+// ── Session Freshness Evaluation ──
+// ══════════════════════════════════════════════
+
+const sessionTimestamps = new Map<string, number>();
+
+function evaluateSessionFreshness(sessionKey: string, config: TinyClawConfig): boolean {
+  const mode = config.session?.resetMode ?? "manual";
+  if (mode === "manual") return false; // never stale
+
+  const lastActive = sessionTimestamps.get(sessionKey) ?? 0;
+  if (lastActive === 0) return false; // no prior session
+
+  const now = Date.now();
+
+  if (mode === "daily") {
+    const resetHour = config.session?.resetAtHour ?? 0;
+    const today = new Date();
+    today.setHours(resetHour, 0, 0, 0);
+    return lastActive < today.getTime();
+  }
+
+  if (mode === "idle") {
+    const idleMs = (config.session?.idleMinutes ?? 120) * 60_000;
+    return (now - lastActive) > idleMs;
+  }
+
+  return false;
 }
 
 // ══════════════════════════════════════════════

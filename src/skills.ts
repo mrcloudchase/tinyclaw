@@ -117,3 +117,28 @@ export function formatSkillsForPrompt(skills: Skill[]): string {
 export function getAllSkills(): Skill[] {
   return [...skillRegistry.values()];
 }
+
+// ── Skill Command Execution ──
+
+export interface SkillExecutionResult {
+  type: "prompt" | "not_found";
+  rewrittenBody?: string;
+}
+
+export function executeSkillCommand(name: string, args: string): SkillExecutionResult {
+  const skill = skillRegistry.get(name);
+  if (!skill) return { type: "not_found" };
+
+  // Check frontmatter for command-dispatch mode
+  const raw = fs.readFileSync(skill.filePath, "utf-8");
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---/);
+  let dispatch: "prompt" | "tool" = "prompt";
+  if (fmMatch) {
+    const cdMatch = fmMatch[1].match(/command-dispatch:\s*(\w+)/);
+    if (cdMatch && cdMatch[1] === "tool") dispatch = "tool";
+  }
+
+  // Prompt-based: rewrite body with skill content as context
+  const context = `[Skill: ${skill.name}]\n\n${skill.content}\n\n---\n\nUser request: ${args || "(no arguments)"}`;
+  return { type: "prompt", rewrittenBody: context };
+}

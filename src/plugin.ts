@@ -187,12 +187,22 @@ export async function discoverAndLoadPlugins(config: TinyClawConfig): Promise<Pl
     await loadPluginFromPath(p, config, registry, "config", shouldLoad);
   }
 
-  // Origin 3: Plugin directory
+  // Origin 3: Plugin directory (~/.config/tinyclaw/plugins/)
   const pluginsDir = resolvePluginsDir();
   if (fs.existsSync(pluginsDir)) {
     const entries = fs.readdirSync(pluginsDir).filter((f) => f.endsWith(".ts") || f.endsWith(".js") || f.endsWith(".mjs"));
     for (const entry of entries) {
       await loadPluginFromPath(path.join(pluginsDir, entry), config, registry, "directory", shouldLoad);
+    }
+  }
+
+  // Origin 4: Workspace plugins (.tinyclaw/plugins/)
+  const workspaceDir = config.workspace?.dir ?? process.cwd();
+  const wsPluginsDir = path.join(workspaceDir, ".tinyclaw", "plugins");
+  if (fs.existsSync(wsPluginsDir)) {
+    const entries = fs.readdirSync(wsPluginsDir).filter((f) => f.endsWith(".ts") || f.endsWith(".js") || f.endsWith(".mjs"));
+    for (const entry of entries) {
+      await loadPluginFromPath(path.join(wsPluginsDir, entry), config, registry, "directory", shouldLoad);
     }
   }
 

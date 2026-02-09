@@ -1,10 +1,11 @@
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import type { AgentSession, AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import type { TinyClawConfig } from "../config/schema.js";
-import { createTinyClawSession, type TinyClawSession } from "./session.js";
+import { createTinyClawSession, type TinyClawSession, type SessionUsage } from "./session.js";
 import { compactSession } from "./compact.js";
+import { truncateOversizedToolResults } from "./pruning.js";
 import { buildFallbackChain, resolveNextFallback } from "../model/resolve.js";
-import { markKeyFailed, markKeySuccess } from "../auth/keys.js";
+import { markKeyFailed, markKeySuccess, classifyFailoverReason, type FailureReason } from "../auth/keys.js";
 import {
   isContextOverflowError,
   isAuthError,
@@ -49,6 +50,7 @@ export async function runAgent(params: {
   const { config, prompt, sessionName, workspaceDir, options = {}, hooks } = params;
 
   let compacted = false;
+  let truncatedToolResults = false;
   let thinkingLevel: ThinkingLevel = params.thinkingLevel ?? (config.agent?.thinkingLevel as ThinkingLevel) ?? "off";
   let tinyClawSession: TinyClawSession;
   const fallbackChain = buildFallbackChain(config);
@@ -70,6 +72,7 @@ export async function runAgent(params: {
   const { session } = tinyClawSession;
 
   let responseText = "";
+  const runUsage: SessionUsage = { inputTokens: 0, outputTokens: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 };
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     options.onEvent?.(event);
 
@@ -79,6 +82,16 @@ export async function runAgent(params: {
         responseText += ame.delta;
         options.onText?.(ame.delta);
       }
+    }
+
+    // Accumulate usage from message_end events
+    if (event.type === "message_end" && (event as any).usage) {
+      const u = (event as any).usage;
+      runUsage.inputTokens += u.input_tokens ?? u.inputTokens ?? 0;
+      runUsage.outputTokens += u.output_tokens ?? u.outputTokens ?? 0;
+      runUsage.cacheRead += u.cache_read_input_tokens ?? u.cacheRead ?? 0;
+      runUsage.cacheWrite += u.cache_creation_input_tokens ?? u.cacheWrite ?? 0;
+      runUsage.totalTokens = runUsage.inputTokens + runUsage.outputTokens;
     }
 
     if (event.type === "tool_execution_start") {
@@ -101,15 +114,33 @@ export async function runAgent(params: {
       try {
         responseText = "";
         await session.prompt(prompt);
-        // Mark key as successful
+        // Mark key as successful + accumulate usage
         markKeySuccess(tinyClawSession.resolved.provider, tinyClawSession.resolved.modelId);
-        await hooks?.("post_run", { prompt, response: responseText });
+        tinyClawSession.usage.inputTokens += runUsage.inputTokens;
+        tinyClawSession.usage.outputTokens += runUsage.outputTokens;
+        tinyClawSession.usage.cacheRead += runUsage.cacheRead;
+        tinyClawSession.usage.cacheWrite += runUsage.cacheWrite;
+        tinyClawSession.usage.totalTokens += runUsage.totalTokens;
+        await hooks?.("post_run", { prompt, response: responseText, usage: runUsage });
         return { text: responseText, compacted, tinyClawSession };
       } catch (error) {
         if (options.abortSignal?.aborted) throw new Error("Aborted");
 
-        // Context overflow → compact & retry
+        // Context overflow → compact first, then truncate oversized tool results
         if (isContextOverflowError(error) && retries < MAX_RETRIES) {
+          if (!truncatedToolResults) {
+            // First try: truncate oversized tool results
+            const messages = (session as any).messages ?? (session as any).agent?.messages;
+            if (messages && Array.isArray(messages)) {
+              const { truncated } = truncateOversizedToolResults(messages, config.agent?.contextWindow);
+              if (truncated > 0) {
+                log.warn(`Truncated ${truncated} oversized tool result(s), retrying...`);
+                truncatedToolResults = true;
+                retries++;
+                continue;
+              }
+            }
+          }
           log.warn("Context overflow, compacting...");
           await compactSession(session);
           compacted = true;
@@ -117,23 +148,38 @@ export async function runAgent(params: {
           continue;
         }
 
+        // Classify error for targeted recovery
+        const reason: FailureReason = classifyFailoverReason(error);
+
+        // Format errors → don't retry
+        if (reason === "format") throw error;
+
         // Rate limit → backoff & retry
-        if (isRateLimitError(error) && retries < MAX_RETRIES) {
+        if (reason === "rate_limit" && retries < MAX_RETRIES) {
           const delayMs = Math.min(1000 * Math.pow(2, retries), 30000);
           log.warn(`Rate limited, waiting ${Math.round(delayMs / 1000)}s...`);
+          markKeyFailed(tinyClawSession.resolved.provider, tinyClawSession.resolved.modelId, reason);
           await new Promise((r) => setTimeout(r, delayMs + Math.random() * delayMs * 0.1));
           retries++;
           continue;
         }
 
-        // Auth error → mark key failed, try fallback model
-        if (isAuthError(error)) {
-          markKeyFailed(tinyClawSession.resolved.provider, tinyClawSession.resolved.modelId);
+        // Timeout → short backoff, retry same key
+        if (reason === "timeout" && retries < MAX_RETRIES) {
+          const delayMs = Math.min(500 * Math.pow(2, retries), 5000);
+          log.warn(`Timeout, retrying in ${Math.round(delayMs / 1000)}s...`);
+          await new Promise((r) => setTimeout(r, delayMs));
+          retries++;
+          continue;
+        }
+
+        // Auth or billing → mark key failed, try fallback model
+        if ((reason === "auth" || reason === "billing") || isAuthError(error)) {
+          markKeyFailed(tinyClawSession.resolved.provider, tinyClawSession.resolved.modelId, reason);
           const next = resolveNextFallback(fallbackIdx, fallbackChain, config);
           if (next && fallbackIdx < fallbackChain.length - 1) {
             fallbackIdx++;
-            log.warn(`Auth failed, falling back to ${next.provider}/${next.modelId}`);
-            // Recreate session with fallback model
+            log.warn(`${reason === "billing" ? "Billing" : "Auth"} failed, falling back to ${next.provider}/${next.modelId}`);
             tinyClawSession = await createTinyClawSession({
               config, sessionName, workspaceDir,
               provider: next.provider, modelId: next.modelId,

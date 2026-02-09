@@ -135,8 +135,7 @@ function computeNextRunAfter(job: CronJob, after: number): number | undefined {
       return lastRun + ms;
     }
     case "cron": {
-      // Simplified: parse common cron patterns
-      return after + 60_000; // Fallback: next minute
+      return nextCronRun(job.schedule, after);
     }
     default:
       return undefined;
@@ -150,6 +149,53 @@ function parseInterval(spec: string): number | undefined {
   const unit = match[2].toLowerCase();
   const multipliers: Record<string, number> = { s: 1000, sec: 1000, m: 60_000, min: 60_000, h: 3_600_000, hr: 3_600_000, d: 86_400_000, day: 86_400_000 };
   return n * (multipliers[unit] ?? 0);
+}
+
+// ── Cron Expression Parser (5-field: min hour dom mon dow) ──
+
+function parseCronField(field: string, min: number, max: number): Set<number> {
+  const values = new Set<number>();
+  for (const part of field.split(",")) {
+    const stepMatch = part.match(/^(.+)\/(\d+)$/);
+    const step = stepMatch ? parseInt(stepMatch[2]) : 1;
+    const range = stepMatch ? stepMatch[1] : part;
+
+    if (range === "*") {
+      for (let i = min; i <= max; i += step) values.add(i);
+    } else if (range.includes("-")) {
+      const [lo, hi] = range.split("-").map(Number);
+      for (let i = lo; i <= hi; i += step) values.add(i);
+    } else {
+      values.add(parseInt(range));
+    }
+  }
+  return values;
+}
+
+function nextCronRun(expr: string, after: number): number | undefined {
+  const fields = expr.trim().split(/\s+/);
+  if (fields.length < 5) return after + 60_000; // fallback
+
+  const minutes = parseCronField(fields[0], 0, 59);
+  const hours = parseCronField(fields[1], 0, 23);
+  const doms = parseCronField(fields[2], 1, 31);
+  const months = parseCronField(fields[3], 1, 12);
+  const dows = parseCronField(fields[4], 0, 6);
+
+  const start = new Date(after + 60_000);
+  start.setSeconds(0, 0);
+
+  for (let i = 0; i < 525960; i++) { // max ~1 year of minutes
+    const d = new Date(start.getTime() + i * 60_000);
+    if (!months.has(d.getMonth() + 1)) continue;
+    if (!doms.has(d.getDate()) && !dows.has(d.getDay())) continue;
+    if (doms.has(d.getDate()) || dows.has(d.getDay())) {
+      if (!hours.has(d.getHours())) continue;
+      if (!minutes.has(d.getMinutes())) continue;
+      return d.getTime();
+    }
+  }
+  return undefined;
 }
 
 // ── Catch-up: run any missed jobs on startup ──

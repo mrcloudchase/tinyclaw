@@ -16,6 +16,10 @@ const AgentModelSchema = z.object({
   primary: z.string().optional(),
   fallbacks: z.array(z.string()).optional(),
 });
+const AgentIdentitySchema = z.object({
+  name: z.string().optional(),
+  emoji: z.string().optional(),
+});
 const AgentSchema = z.object({
   provider: z.string().default("anthropic"),
   model: z.string().default("claude-sonnet-4-5-20250929"),
@@ -23,6 +27,8 @@ const AgentSchema = z.object({
   contextWindow: z.number().positive().optional(),
   maxTokens: z.number().positive().optional(),
   fallbacks: z.array(z.string()).optional(),
+  identity: AgentIdentitySchema.optional(),
+  responsePrefix: z.string().optional(),
 });
 
 // ── Custom Models ──
@@ -279,6 +285,13 @@ const MultiAgentSchema = z.object({
   }).optional(),
 });
 
+// ── Session ──
+const SessionSchema = z.object({
+  resetMode: z.enum(["daily", "idle", "manual"]).default("manual"),
+  resetAtHour: z.number().min(0).max(23).default(0),
+  idleMinutes: z.number().positive().default(120),
+});
+
 // ── Pipeline ──
 const PipelineSchema = z.object({
   inboundDebounceMs: z.number().default(1500),
@@ -292,6 +305,7 @@ const PipelineSchema = z.object({
     max: z.number().default(2500),
   }).optional(),
   typingIndicator: z.boolean().default(true),
+  envelope: z.boolean().default(true),
 });
 
 // ── Sandbox ──
@@ -329,6 +343,7 @@ export const TinyClawConfigSchema = z.object({
   sandbox: SandboxSchema.optional(),
   multiAgent: MultiAgentSchema.optional(),
   pipeline: PipelineSchema.optional(),
+  session: SessionSchema.optional(),
 });
 
 export type TinyClawConfig = z.infer<typeof TinyClawConfigSchema>;

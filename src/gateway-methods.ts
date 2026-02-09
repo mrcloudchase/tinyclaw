@@ -215,10 +215,87 @@ defineMethod("exec.deny", async (params) => {
 });
 
 // ══════════════════════════════════════════════
+// ── Memory Methods ──
+// ══════════════════════════════════════════════
+
+// 15. memory.search
+defineMethod("memory.search", async (params, config) => {
+  const query = params.query as string;
+  if (!query) throw new Error("Missing 'query' parameter");
+  const limit = (params.limit as number) ?? 10;
+  const { createMemoryStore } = await import("./memory.js");
+  const store = createMemoryStore(config);
+  const results = await store.search(query, limit);
+  return { results: results.map((r) => ({ id: r.entry.id, content: r.entry.content, score: r.score, matchType: r.matchType })) };
+});
+
+// 16. memory.store
+defineMethod("memory.store", async (params, config) => {
+  const content = params.content as string;
+  if (!content) throw new Error("Missing 'content' parameter");
+  const { createMemoryStore } = await import("./memory.js");
+  const store = createMemoryStore(config);
+  const id = await store.store(content, (params.metadata as Record<string, unknown>) ?? {}, (params.tags as string[]) ?? []);
+  return { id };
+});
+
+// ══════════════════════════════════════════════
+// ── Cron Methods ──
+// ══════════════════════════════════════════════
+
+// 17. cron.list
+defineMethod("cron.list", async (_params, config) => {
+  const { createCronStore } = await import("./cron.js");
+  const store = createCronStore(config);
+  return { jobs: store.list() };
+});
+
+// 18. cron.add
+defineMethod("cron.add", async (params, config) => {
+  const { createCronStore } = await import("./cron.js");
+  const store = createCronStore(config);
+  const job = {
+    id: params.id as string ?? `job_${Date.now()}`,
+    name: params.name as string ?? "Untitled",
+    type: (params.type as "at" | "every" | "cron") ?? "cron",
+    schedule: params.schedule as string,
+    prompt: params.prompt as string,
+    sessionName: params.sessionName as string,
+    enabled: params.enabled !== false,
+    createdAt: Date.now(),
+  };
+  if (!job.schedule || !job.prompt) throw new Error("Missing 'schedule' or 'prompt'");
+  store.set(job);
+  return { job };
+});
+
+// 19. cron.remove
+defineMethod("cron.remove", async (params, config) => {
+  const id = params.id as string;
+  if (!id) throw new Error("Missing 'id' parameter");
+  const { createCronStore } = await import("./cron.js");
+  const store = createCronStore(config);
+  return { deleted: store.delete(id) };
+});
+
+// ══════════════════════════════════════════════
+// ── Session Detail Methods ──
+// ══════════════════════════════════════════════
+
+// 20. sessions.get
+defineMethod("sessions.get", async (params) => {
+  const key = params.sessionKey as string;
+  if (!key) throw new Error("Missing 'sessionKey' parameter");
+  const keys = getActiveSessionKeys();
+  const exists = keys.includes(key);
+  return { sessionKey: key, exists };
+});
+
+// ══════════════════════════════════════════════
 // ── System Methods ──
 // ══════════════════════════════════════════════
 
-// 15. system.shutdown
+// 21. system.shutdown
 defineMethod("system.shutdown", async (_params, _config, ctx) => {
   const { stopGateway, broadcast } = await import("./gateway.js");
   broadcast(ctx, "system.shutdown", { reason: "RPC shutdown request" });

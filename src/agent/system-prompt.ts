@@ -31,6 +31,12 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   apply_patch: "Apply a code patch",
 };
 
+export interface GroupContext {
+  groupSubject?: string;
+  memberCount?: number;
+  activationMode?: string;
+}
+
 export interface SystemPromptParams {
   workspaceDir: string;
   toolNames: string[];
@@ -41,14 +47,18 @@ export interface SystemPromptParams {
   skillsSummary?: string;
   channelContext?: string;
   agentId?: string;
+  groupContext?: GroupContext;
 }
 
 export function buildSystemPrompt(params: SystemPromptParams): string {
-  const { workspaceDir, toolNames, model, thinkingLevel, config, bootstrapContent, skillsSummary, channelContext, agentId } = params;
+  const { workspaceDir, toolNames, model, thinkingLevel, config, bootstrapContent, skillsSummary, channelContext, agentId, groupContext } = params;
   const s: string[] = [];
 
-  // 1. Identity
-  s.push(`You are TinyClaw${agentId ? ` (agent: ${agentId})` : ""}, a local AI assistant. You help users with software engineering, system administration, research, and general tasks.`);
+  // 1. Identity (with optional name from config)
+  const identity = config.agent?.identity;
+  const name = identity?.name ?? "TinyClaw";
+  const emoji = identity?.emoji ? ` ${identity.emoji}` : "";
+  s.push(`You are ${name}${emoji}${agentId ? ` (agent: ${agentId})` : ""}, a local AI assistant. You help users with software engineering, system administration, research, and general tasks.`);
 
   // 2. Tools
   const toolList = toolNames.map((n) => `- ${n}: ${TOOL_DESCRIPTIONS[n] || n}`).join("\n");
@@ -117,7 +127,20 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
   // 16. Commands
   s.push("## Commands\n\nUsers can use slash commands:\n- `/new` — Reset session\n- `/compact` — Compact context\n- `/model [name]` — Switch model\n- `/stop` — Stop generation\n- `/reset` — Full reset");
 
-  // 17. Bootstrap/Context
+  // 17. Group chat context
+  if (groupContext) {
+    const lines: string[] = [];
+    if (groupContext.groupSubject) lines.push(`Group: ${groupContext.groupSubject}`);
+    if (groupContext.memberCount) lines.push(`Members: ~${groupContext.memberCount}`);
+    if (groupContext.activationMode) lines.push(`Activation: ${groupContext.activationMode}`);
+    lines.push("Write naturally, avoid markdown tables in group chat. Address the specific sender noted in the message context.");
+    if (groupContext.activationMode === "always-on") {
+      lines.push("You are always active in this group. You may choose to stay silent if the conversation doesn't concern you.");
+    }
+    s.push(`## Group Chat\n\n${lines.join("\n")}`);
+  }
+
+  // 18. Bootstrap/Context
   if (bootstrapContent) {
     s.push(`## Project Context\n\n${bootstrapContent}`);
   }
@@ -126,7 +149,7 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
 }
 
 export function loadBootstrapContent(workspaceDir: string): string | undefined {
-  const candidates = ["TINYCLAW.md", "CLAUDE.md", "AGENTS.md", ".tinyclaw", ".claude"];
+  const candidates = ["SOUL.md", "TINYCLAW.md", "CLAUDE.md", "AGENTS.md", ".tinyclaw", ".claude"];
   const parts: string[] = [];
   for (const filename of candidates) {
     const filePath = path.join(workspaceDir, filename);
@@ -135,7 +158,12 @@ export function loadBootstrapContent(workspaceDir: string): string | undefined {
         const stat = fs.statSync(filePath);
         if (stat.isFile() && stat.size < 50_000) {
           const content = fs.readFileSync(filePath, "utf-8").trim();
-          if (content) parts.push(`### ${filename}\n\n${content}`);
+          if (!content) continue;
+          if (filename === "SOUL.md") {
+            parts.unshift(`### Personality\n\nEmbody the persona and tone described below.\n\n${content}`);
+          } else {
+            parts.push(`### ${filename}\n\n${content}`);
+          }
         }
       }
     } catch { /* skip */ }

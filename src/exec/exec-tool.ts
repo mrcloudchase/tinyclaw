@@ -2,6 +2,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import { getShellConfig, killProcessTree } from "./shell.js";
 import { log } from "../util/logger.js";
+import type { TinyClawConfig } from "../config/schema.js";
+import type { ApprovalMode } from "../security.js";
 
 interface ExecToolOptions {
   cwd?: string;
@@ -9,6 +11,8 @@ interface ExecToolOptions {
   backgroundMs?: number;
   maxOutput?: number;
   sandboxContainer?: string;
+  config?: TinyClawConfig;
+  source?: "cli" | "gateway" | "channel";
 }
 
 interface ExecSession {
@@ -176,6 +180,8 @@ export function createExecTool(options?: ExecToolOptions) {
   const defaultBackgroundMs = options?.backgroundMs ?? 10000;
   const defaultMaxOutput = options?.maxOutput ?? 200_000;
   const sandboxContainer = options?.sandboxContainer;
+  const execConfig = options?.config;
+  const execSource = options?.source;
 
   return {
     name: "bash" as const,
@@ -216,6 +222,22 @@ export function createExecTool(options?: ExecToolOptions) {
     ) {
       const { command, workdir, timeout, background } = params;
       log.debug(`exec: ${command}`);
+
+      // Exec approval for channel sessions in interactive mode
+      if (execSource === "channel" && execConfig?.security?.execApproval === "interactive") {
+        const { requestApproval, isCommandAllowed } = await import("../security.js");
+        if (!isCommandAllowed(command)) {
+          const { id, promise } = requestApproval(command);
+          log.info(`Exec approval requested: ${id} — "${command}"`);
+          const approved = await promise;
+          if (!approved) {
+            return { content: [{ type: "text" as const, text: "Command denied by admin." }] };
+          }
+          // Track approval for auto-allowlist
+          const { trackApproval } = await import("../security.js");
+          trackApproval(command);
+        }
+      }
 
       const result = await executeCommand(command, {
         cwd: workdir ? path.resolve(defaultCwd, workdir) : defaultCwd,
